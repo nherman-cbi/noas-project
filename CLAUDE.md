@@ -13,13 +13,18 @@ open shooter.html
 
 ## Repository Workflow
 
-Every change should be committed and pushed to GitHub:
+**Commit and push to GitHub after every meaningful unit of work** — do not batch multiple features into one commit or wait until the end of a session. This ensures work is never lost and the history is easy to revert.
 
 ```bash
 git add <file>
 git commit -m "descriptive message"
 git push
 ```
+
+Commit message rules:
+- Use imperative mood ("Add ...", "Fix ...", "Update ...")
+- Subject line describes *what and why*, not just *what*
+- Keep subject under 72 characters
 
 GitHub repo: https://github.com/nherman-cbi/noas-project
 
