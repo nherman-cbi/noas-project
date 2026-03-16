@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Endless Runner</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #0a0a0f;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      overflow: hidden;
+    }
+    #gameCanvas {
+      display: block;
+      image-rendering: pixelated;
+    }
+  </style>
+</head>
+<body>
+<canvas id="gameCanvas" width="800" height="450"></canvas>
+<script>
+// ─────────────────────────────────────────────
+// CONFIG
+// ─────────────────────────────────────────────
+const CONFIG = {
+  W: 800, H: 450,
+  GROUND_Y: 370,
+  PLAYER_X: 110,
+  PLAYER_W: 28,
+  PLAYER_H: 44,
+  JUMP_VEL: -740,
+  GRAVITY: 2100,
+  INIT_SPEED: 300,
+  MAX_SPEED: 820,
+  SPEED_RAMP: 11,        // px/s gained per second
+  OBS_GAP_START: 1.25,   // seconds between obstacles at start
+  OBS_GAP_MIN: 0.52,     // minimum gap at max speed
+  COLORS: {
+    BG:            '#0d0d14',
+    DOT:           '#1a1a28',
+    GROUND_FILL:   '#0b0e1a',
+    GROUND_TOP:    '#2a3a5a',
+    GROUND_DASH:   '#151e30',
+    PLAYER_BODY:   '#00ffee',
+    PLAYER_SKIN:   '#ffcc99',
+    PLAYER_LEGS:   '#2244aa',
+    OBSTACLE:      '#ff3355',
+    OBSTACLE_DARK: '#8c0a22',
+    OBSTACLE_TRIM: '#ff6680',
+    CLOUD:         '#181e32',
+    HUD:           '#ccffee',
+    HUD_DIM:       '#3a5545',
+    TITLE:         '#00ffee',
+    SUBTITLE:      '#88ffdd',
+    SCORE_FLASH:   '#ffdd44',
+    PARTICLE_A:    '#00ffee',
+    PARTICLE_B:    '#ffcc99',
+    PARTICLE_C:    '#2244aa',
+  },
+};
+
+// ─────────────────────────────────────────────
+// AUDIO
+// ─────────────────────────────────────────────
+class AudioManager {
+  constructor() { this.ctx = null; this.ready = false; }
+
+  init() {
+    if (this.ready) return;
+    try {
+      this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+      this.ready = true;
+    } catch(e) {}
+  }
+
+  _play(type, freq, freqEnd, dur, vol = 0.15) {
+    if (!this.ready || !this.ctx) return;
+    try {
+      const osc  = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.type = type;
+      const t = this.ctx.currentTime;
+      osc.frequency.setValueAtTime(freq, t);
+      if (freqEnd !== null) osc.frequency.exponentialRampToValueAtTime(freqEnd, t + dur);
+      gain.gain.setValueAtTime(vol, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + dur);
+      osc.start(t);
+      osc.stop(t + dur);
+    } catch(e) {}
+  }
+
+  jump()   { this._play('square',   280,  520, 0.13, 0.13); }
+  land()   { this._play('sine',     110,   70, 0.08, 0.12); }
+  die()    {
+    this._play('sawtooth', 240,  55, 0.45, 0.22);
+    setTimeout(() => this._play('sawtooth', 170, 40, 0.40, 0.16), 130);
+  }
+  score()  { this._play('sine',     700,  920, 0.14, 0.10); }
+  blip()   { this._play('sine',     480,  640, 0.10, 0.09); }
+}
+
+// ─────────────────────────────────────────────
+// PARTICLE
+// ─────────────────────────────────────────────
+class Particle {
+  constructor(x, y, color) {
+    this.x = x; this.y = y;
+    this.color = color;
+    const a = Math.random() * Math.PI * 2;
+    const s = 55 + Math.random() * 130;
+    this.vx = Math.cos(a) * s;
+    this.vy = Math.sin(a) * s - 90;
+    this.size = 2 + Math.random() * 4;
+    this.life = 0.45 + Math.random() * 0.45;
+    this.age  = 0;
+  }
+  update(dt) {
+    this.vy += 1400 * dt;
+    this.x  += this.vx * dt;
+    this.y  += this.vy * dt;
+    this.age += dt;
+  }
+  draw(ctx) {
+    ctx.globalAlpha = Math.max(0, 1 - this.age / this.life);
+    ctx.fillStyle   = this.color;
+    ctx.fillRect(this.x - this.size / 2, this.y - this.size / 2, this.size, this.size);
+    ctx.globalAlpha = 1;
+  }
+  isDead() { return this.age >= this.life; }
+}
+
+// ─────────────────────────────────────────────
+// PLAYER
+// ─────────────────────────────────────────────
+class Player {
+  constructor() {
+    this.x         = CONFIG.PLAYER_X;
+    this.y         = CONFIG.GROUND_Y - CONFIG.PLAYER_H;
+    this.vy        = 0;
+    this.onGround  = true;
+    this.dead      = false;
+    this.walkFrame = 0;
+    this.walkTimer = 0;
+    this.landTimer = 0;   // squat on landing
+    this.deathTimer = 0;
+  }
+
+  jump(audio) {
+    if (!this.onGround || this.dead) return;
+    this.vy = CONFIG.JUMP_VEL;
+    this.onGround = false;
+    audio.jump();
+  }
+
+  update(dt, audio) {
+    if (this.dead) { this.deathTimer += dt; return; }
+
+    this.vy += CONFIG.GRAVITY * dt;
+    this.y  += this.vy * dt;
+
+    // Land
+    const groundTop = CONFIG.GROUND_Y - CONFIG.PLAYER_H;
+    if (this.y >= groundTop) {
+      const wasAirborne = !this.onGround;
+      this.y        = groundTop;
+      this.vy       = 0;
+      this.onGround = true;
+      if (wasAirborne) { audio.land(); this.landTimer = 0.12; }
+    }
+
+    if (this.landTimer > 0) this.landTimer -= dt;
+
+    // Walk cycle
+    if (this.onGround && this.landTimer <= 0) {
+      this.walkTimer += dt;
+      if (this.walkTimer > 0.075) { this.walkTimer = 0; this.walkFrame = (this.walkFrame + 1) % 4; }
+    }
+  }
+
+  // Inset hitbox for fair collisions
+  hitsRect(ox, oy, ow, oh) {
+    const px = this.x + 6,  pw = CONFIG.PLAYER_W - 12;
+    const py = this.y + 8,  ph = CONFIG.PLAYER_H - 12;
+    return px < ox + ow && px + pw > ox && py < oy + oh && py + ph > oy;
+  }
+
+  draw(ctx) {
+    if (this.dead) {
+      const cx = this.x + CONFIG.PLAYER_W / 2;
+      const cy = this.y + CONFIG.PLAYER_H / 2;
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(this.deathTimer * 9);
+      ctx.translate(-CONFIG.PLAYER_W / 2, -CONFIG.PLAYER_H / 2);
+      this._drawBody(ctx, 0, 0);
+      ctx.restore();
+    } else {
+      this._drawBody(ctx, this.x, this.y);
+    }
+  }
+
+  _drawBody(ctx, x, y) {
+    const W  = CONFIG.PLAYER_W;
+    const H  = CONFIG.PLAYER_H;
+    const sq = this.landTimer > 0 ? 3 : 0;  // squat offset
+
+    // Leg animation offsets (stride cycle)
+    const strides = [0, 7, 0, -7];
+    const lOff    = this.onGround && this.landTimer <= 0 ? strides[this.walkFrame] : 0;
+
+    // Legs
+    ctx.fillStyle = CONFIG.COLORS.PLAYER_LEGS;
+    ctx.fillRect(x + 4,      y + H - 16 + lOff + sq, 9, 16 - sq);
+    ctx.fillRect(x + W - 13, y + H - 16 - lOff + sq, 9, 16 - sq);
+
+    // Body
+    ctx.fillStyle = CONFIG.COLORS.PLAYER_BODY;
+    ctx.fillRect(x + 2, y + 14 + sq, W - 4, H - 30 - sq);
+
+    // Head
+    ctx.fillStyle = CONFIG.COLORS.PLAYER_SKIN;
+    ctx.fillRect(x + 4, y + sq, W - 8, 16);
+
+    // Eyes
+    ctx.fillStyle = '#000';
+    if (this.dead) {
+      // × eyes
+      ctx.fillRect(x + 7,      y + 4 + sq, 2, 2);
+      ctx.fillRect(x + 9,      y + 6 + sq, 2, 2);
+      ctx.fillRect(x + 9,      y + 4 + sq, 2, 2);
+      ctx.fillRect(x + 7,      y + 6 + sq, 2, 2);
+      ctx.fillRect(x + W - 11, y + 4 + sq, 2, 2);
+      ctx.fillRect(x + W - 9,  y + 6 + sq, 2, 2);
+      ctx.fillRect(x + W - 9,  y + 4 + sq, 2, 2);
+      ctx.fillRect(x + W - 11, y + 6 + sq, 2, 2);
+    } else {
+      ctx.fillRect(x + 7,      y + 5 + sq, 3, 3);
+      ctx.fillRect(x + W - 10, y + 5 + sq, 3, 3);
+    }
+
+    // Pumping arm while airborne
+    if (!this.onGround && !this.dead) {
+      ctx.fillStyle = CONFIG.COLORS.PLAYER_SKIN;
+      const armY = y + 16 + Math.sin(Date.now() / 80) * 4;
+      ctx.fillRect(x - 5, armY, 7, 9);
+    }
+  }
+}
+
+// ─────────────────────────────────────────────
+// OBSTACLE
+// ─────────────────────────────────────────────
+class Obstacle {
+  // type: 'short' | 'tall' | 'wide'
+  constructor(x, type) {
+    this.type = type;
+    this.dead = false;
+    const dims = { short: { w: 24, h: 42 }, tall: { w: 24, h: 76 }, wide: { w: 58, h: 42 } };
+    const d    = dims[type];
+    this.w = d.w;
+    this.h = d.h;
+    this.x = x;
+    this.y = CONFIG.GROUND_Y - this.h;
+  }
+
+  update(dt, speed) {
+    this.x -= speed * dt;
+    if (this.x + this.w < -20) this.dead = true;
+  }
+
+  draw(ctx) {
+    const { x, y, w, h } = this;
+
+    // Shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    ctx.fillRect(x + 3, y + 3, w, h);
+
+    // Main body
+    ctx.fillStyle = CONFIG.COLORS.OBSTACLE;
+    ctx.fillRect(x, y, w, h);
+
+    // Dark inset panel
+    ctx.fillStyle = CONFIG.COLORS.OBSTACLE_DARK;
+    ctx.fillRect(x + 3, y + 3, w - 6, h - 6);
+
+    // Bright top edge
+    ctx.fillStyle = CONFIG.COLORS.OBSTACLE_TRIM;
+    ctx.fillRect(x, y, w, 3);
+    ctx.fillRect(x, y, 3, h);
+
+    // Detail slots (for tall / wide obstacles)
+    if (h >= 60) {
+      ctx.fillStyle = CONFIG.COLORS.OBSTACLE;
+      for (let slot = 8; slot + 8 < h; slot += 18) {
+        ctx.fillRect(x + 6, y + slot, w - 12, 7);
+      }
+    } else if (w >= 50) {
+      ctx.fillStyle = CONFIG.COLORS.OBSTACLE;
+      ctx.fillRect(x + 8,  y + 8, 14, h - 16);
+      ctx.fillRect(x + w - 22, y + 8, 14, h - 16);
+    }
+  }
+}
+
+// ─────────────────────────────────────────────
+// CLOUD (parallax background decoration)
+// ─────────────────────────────────────────────
+class Cloud {
+  constructor(x) {
+    this.x     = x;
+    this.y     = 30 + Math.random() * 110;
+    this.w     = 70 + Math.random() * 90;
+    this.h     = 14 + Math.random() * 20;
+    this.parallax = 0.12 + Math.random() * 0.08;
+  }
+  update(dt, speed) {
+    this.x -= speed * this.parallax * dt;
+    if (this.x + this.w < -10) this.x = CONFIG.W + 20 + Math.random() * 200;
+  }
+  draw(ctx) {
+    const { x, y, w, h } = this;
+    ctx.fillStyle = CONFIG.COLORS.CLOUD;
+    ctx.fillRect(x,             y + h * 0.45, w,            h * 0.55);
+    ctx.fillRect(x + w * 0.08,  y,            w * 0.52,     h);
+    ctx.fillRect(x + w * 0.52,  y + h * 0.18, w * 0.42,    h * 0.82);
+  }
+}
+
+// ─────────────────────────────────────────────
+// GAME
+// ─────────────────────────────────────────────
+class Game {
+  constructor(canvas) {
+    this.canvas = canvas;
+    this.ctx    = canvas.getContext('2d');
+    this.audio  = new AudioManager();
+
+    this.state     = 'MENU';
+    this.score     = 0;
+    this.highScore = +(localStorage.getItem('noa_runner_hs') || 0);
+    this.newBest   = false;
+
+    this.speed       = CONFIG.INIT_SPEED;
+    this.elapsed     = 0;
+    this.bgOffset    = 0;
+    this.gndOffset   = 0;
+
+    this.player    = null;
+    this.obstacles = [];
+    this.particles = [];
+    this.clouds    = [];
+
+    this.nextObsIn  = 1.4;
+    this.scoreTimer = 0;
+    this.blinkTimer = 0;
+    this.blinkOn    = true;
+    this.shakeTimer = 0;
+    this.flashTimer = 0;
+
+    this._initClouds();
+    this._bindInput();
+
+    this._lastTime = 0;
+    requestAnimationFrame(t => this._loop(t));
+  }
+
+  _initClouds() {
+    for (let i = 0; i < 6; i++) {
+      this.clouds.push(new Cloud(Math.random() * CONFIG.W));
+    }
+  }
+
+  _bindInput() {
+    window.addEventListener('keydown', e => {
+      if (e.code === 'Space' || e.code === 'ArrowUp') {
+        e.preventDefault();
+        this._action();
+      }
+    });
+    this.canvas.addEventListener('pointerdown', () => this._action());
+  }
+
+  _action() {
+    if (this.state === 'MENU') {
+      this.audio.init();
+      this.audio.blip();
+      this._startGame();
+    } else if (this.state === 'GAME_OVER') {
+      this.audio.blip();
+      this._startGame();
+    } else if (this.state === 'PLAYING') {
+      this.player.jump(this.audio);
+    }
+  }
+
+  _startGame() {
+    this.score     = 0;
+    this.speed     = CONFIG.INIT_SPEED;
+    this.elapsed   = 0;
+    this.bgOffset  = 0;
+    this.gndOffset = 0;
+    this.obstacles = [];
+    this.particles = [];
+    this.nextObsIn = 1.4;
+    this.scoreTimer = 0;
+    this.flashTimer = 0;
+    this.newBest   = false;
+    this.player    = new Player();
+    this.state     = 'PLAYING';
+  }
+
+  _loop(ts) {
+    let dt = (ts - this._lastTime) / 1000;
+    this._lastTime = ts;
+    if (dt > 0.05) dt = 0.05;
+    this.update(dt);
+    this.render();
+    requestAnimationFrame(t => this._loop(t));
+  }
+
+  update(dt) {
+    this.blinkTimer += dt;
+    if (this.blinkTimer > 0.55) { this.blinkTimer = 0; this.blinkOn = !this.blinkOn; }
+    if (this.shakeTimer > 0) this.shakeTimer -= dt;
+    if (this.flashTimer > 0) this.flashTimer -= dt;
+
+    // Clouds always drift
+    for (const c of this.clouds) c.update(dt, this.speed);
+
+    if (this.state !== 'PLAYING') return;
+
+    this.elapsed  += dt;
+    this.bgOffset  = (this.bgOffset  + this.speed * 0.05 * dt * 60) % 32;
+    this.gndOffset = (this.gndOffset + this.speed * dt) % 90;
+
+    // Ramp speed up to max
+    this.speed = Math.min(CONFIG.MAX_SPEED, CONFIG.INIT_SPEED + CONFIG.SPEED_RAMP * this.elapsed);
+
+    // Score: +1 every 0.1 s
+    this.scoreTimer += dt;
+    if (this.scoreTimer >= 0.1) {
+      this.scoreTimer = 0;
+      this.score++;
+      if (this.score > 0 && this.score % 50 === 0) {
+        this.audio.score();
+        this.flashTimer = 0.9;
+      }
+    }
+
+    // Player physics
+    this.player.update(dt, this.audio);
+
+    // Obstacle spawning — gap shrinks as speed increases
+    this.nextObsIn -= dt;
+    if (this.nextObsIn <= 0) {
+      this._spawnObstacle();
+      const frac = (this.speed - CONFIG.INIT_SPEED) / (CONFIG.MAX_SPEED - CONFIG.INIT_SPEED);
+      const gap  = CONFIG.OBS_GAP_START - frac * (CONFIG.OBS_GAP_START - CONFIG.OBS_GAP_MIN);
+      this.nextObsIn = gap * (0.75 + Math.random() * 0.65);
+    }
+
+    // Move obstacles
+    for (const o of this.obstacles) o.update(dt, this.speed);
+
+    // Particles
+    for (const p of this.particles) p.update(dt);
+
+    // Collision check
+    for (const o of this.obstacles) {
+      if (!o.dead && this.player.hitsRect(o.x, o.y, o.w, o.h)) {
+        this._killPlayer();
+        return;
+      }
+    }
+
+    // Cleanup
+    this.obstacles = this.obstacles.filter(o => !o.dead);
+    this.particles = this.particles.filter(p => !p.isDead());
+  }
+
+  _spawnObstacle() {
+    const roll = Math.random();
+    let type;
+    if (roll < 0.45)      type = 'short';
+    else if (roll < 0.75) type = 'tall';
+    else                  type = 'wide';
+    this.obstacles.push(new Obstacle(CONFIG.W + 20, type));
+  }
+
+  _killPlayer() {
+    this.player.dead = true;
+    this.state       = 'GAME_OVER';
+    this.shakeTimer  = 0.45;
+    this.audio.die();
+
+    // Burst particles in player colors
+    const px = this.player.x + CONFIG.PLAYER_W / 2;
+    const py = this.player.y + CONFIG.PLAYER_H / 2;
+    const cols = [CONFIG.COLORS.PARTICLE_A, CONFIG.COLORS.PARTICLE_B, CONFIG.COLORS.PARTICLE_C];
+    for (let i = 0; i < 28; i++) {
+      this.particles.push(new Particle(px, py, cols[i % 3]));
+    }
+
+    if (this.score > this.highScore) {
+      this.highScore = this.score;
+      this.newBest   = true;
+      localStorage.setItem('noa_runner_hs', this.highScore);
+    }
+  }
+
+  // ─────────────────────────────────────────────
+  // RENDER
+  // ─────────────────────────────────────────────
+  render() {
+    const ctx      = this.ctx;
+    const { W, H } = CONFIG;
+
+    ctx.save();
+
+    // Screen shake
+    if (this.shakeTimer > 0) {
+      const amt = 8 * (this.shakeTimer / 0.45);
+      ctx.translate((Math.random() - 0.5) * amt * 2, (Math.random() - 0.5) * amt * 2);
+    }
+
+    // Background
+    ctx.fillStyle = CONFIG.COLORS.BG;
+    ctx.fillRect(-10, -10, W + 20, H + 20);
+
+    // Dot grid
+    this._drawDots(ctx);
+
+    // Clouds
+    for (const c of this.clouds) c.draw(ctx);
+
+    // Speed streak lines at high speed
+    this._drawStreaks(ctx);
+
+    // Ground
+    this._drawGround(ctx);
+
+    if (this.state === 'MENU') {
+      this._drawIdlePlayer(ctx);
+      this._drawMenu(ctx);
+    } else {
+      // Obstacles behind player
+      for (const o of this.obstacles) o.draw(ctx);
+      if (this.player) this.player.draw(ctx);
+      for (const p of this.particles) p.draw(ctx);
+      this._drawHUD(ctx);
+      if (this.state === 'GAME_OVER') this._drawGameOver(ctx);
+    }
+
+    ctx.restore();
+  }
+
+  _drawDots(ctx) {
+    const off = Math.floor(this.bgOffset);
+    ctx.fillStyle = CONFIG.COLORS.DOT;
+    for (let x = (off % 32) - 32; x < CONFIG.W + 32; x += 32) {
+      for (let y = -32; y < CONFIG.GROUND_Y; y += 32) {
+        ctx.fillRect(x + (off % 32), y + (off % 32), 2, 2);
+      }
+    }
+  }
+
+  _drawStreaks(ctx) {
+    if (this.state !== 'PLAYING') return;
+    const frac = (this.speed - CONFIG.INIT_SPEED) / (CONFIG.MAX_SPEED - CONFIG.INIT_SPEED);
+    if (frac < 0.25) return;
+    const alpha = (frac - 0.25) * 0.18;
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = CONFIG.COLORS.PLAYER_BODY;
+    const streakCount = Math.floor(frac * 8);
+    for (let i = 0; i < streakCount; i++) {
+      const sy = 160 + i * 22;
+      const sw = 20 + Math.random() * 60;
+      ctx.fillRect(CONFIG.PLAYER_X - sw - 10, sy, sw, 1);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  _drawGround(ctx) {
+    const { W, GROUND_Y, H } = CONFIG;
+    const off = Math.floor(this.gndOffset);
+
+    // Fill
+    ctx.fillStyle = CONFIG.COLORS.GROUND_FILL;
+    ctx.fillRect(0, GROUND_Y, W, H - GROUND_Y);
+
+    // Bright top edge
+    ctx.fillStyle = CONFIG.COLORS.GROUND_TOP;
+    ctx.fillRect(0, GROUND_Y, W, 3);
+
+    // Scrolling lane dashes
+    ctx.fillStyle = CONFIG.COLORS.GROUND_DASH;
+    for (let x = -(off % 90); x < W + 90; x += 90) {
+      ctx.fillRect(x, GROUND_Y + 16, 45, 2);
+    }
+  }
+
+  _drawIdlePlayer(ctx) {
+    // Render a static standing player for the menu screen
+    const dummy = {
+      onGround: true, dead: false, landTimer: 0,
+      walkFrame: 0,
+      x: CONFIG.PLAYER_X,
+      y: CONFIG.GROUND_Y - CONFIG.PLAYER_H,
+    };
+    Player.prototype._drawBody.call(dummy, ctx, dummy.x, dummy.y);
+  }
+
+  _drawHUD(ctx) {
+    const { W } = CONFIG;
+    const flashing = this.flashTimer > 0 && Math.floor(this.flashTimer * 9) % 2 === 0;
+
+    // Score (top-right)
+    ctx.textAlign = 'right';
+    ctx.font = 'bold 30px monospace';
+    ctx.fillStyle = flashing ? CONFIG.COLORS.SCORE_FLASH : CONFIG.COLORS.HUD;
+    if (flashing) {
+      ctx.shadowColor = CONFIG.COLORS.SCORE_FLASH;
+      ctx.shadowBlur  = 14;
+    }
+    ctx.fillText(String(this.score).padStart(5, '0'), W - 16, 38);
+    ctx.shadowBlur = 0;
+
+    ctx.font = '11px monospace';
+    ctx.fillStyle = CONFIG.COLORS.HUD_DIM;
+    ctx.fillText('SCORE', W - 16, 54);
+
+    if (this.highScore > 0) {
+      ctx.font = '13px monospace';
+      ctx.fillStyle = CONFIG.COLORS.HUD_DIM;
+      ctx.fillText(`BEST  ${String(this.highScore).padStart(5, '0')}`, W - 16, 74);
+    }
+
+    // Speed bar (top-left)
+    const frac  = (this.speed - CONFIG.INIT_SPEED) / (CONFIG.MAX_SPEED - CONFIG.INIT_SPEED);
+    const barW  = 88;
+    ctx.textAlign = 'left';
+    ctx.font = '10px monospace';
+    ctx.fillStyle = CONFIG.COLORS.HUD_DIM;
+    ctx.fillText('SPD', 16, 26);
+    ctx.fillStyle = '#111827';
+    ctx.fillRect(16, 30, barW, 7);
+    ctx.fillStyle = frac > 0.8 ? '#ff4466' : frac > 0.45 ? '#ffaa22' : CONFIG.COLORS.PLAYER_BODY;
+    ctx.fillRect(16, 30, Math.round(barW * frac), 7);
+    ctx.strokeStyle = CONFIG.COLORS.HUD_DIM;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(16, 30, barW, 7);
+  }
+
+  _drawMenu(ctx) {
+    const { W, H } = CONFIG;
+    ctx.textAlign = 'center';
+
+    ctx.font = 'bold 74px monospace';
+    ctx.fillStyle   = CONFIG.COLORS.TITLE;
+    ctx.shadowColor = CONFIG.COLORS.TITLE;
+    ctx.shadowBlur  = 32;
+    ctx.fillText('RUNNER', W / 2, 128);
+    ctx.shadowBlur = 0;
+
+    ctx.font = 'bold 20px monospace';
+    ctx.fillStyle = CONFIG.COLORS.SUBTITLE;
+    ctx.fillText('ENDLESS SPRINT', W / 2, 163);
+
+    ctx.font = '14px monospace';
+    ctx.fillStyle = '#3a5545';
+    ctx.fillText('SPACE / TAP — JUMP', W / 2, 220);
+
+    if (this.highScore > 0) {
+      ctx.font = 'bold 15px monospace';
+      ctx.fillStyle = '#886633';
+      ctx.fillText(`BEST: ${this.highScore}`, W / 2, 256);
+    }
+
+    if (this.blinkOn) {
+      ctx.font = 'bold 19px monospace';
+      ctx.fillStyle   = CONFIG.COLORS.TITLE;
+      ctx.shadowColor = CONFIG.COLORS.TITLE;
+      ctx.shadowBlur  = 14;
+      ctx.fillText('PRESS SPACE OR TAP TO START', W / 2, 308);
+      ctx.shadowBlur = 0;
+    }
+
+    // Decorative obstacles flanking the player
+    const o1 = new Obstacle(CONFIG.W - 140, 'tall');
+    o1.draw(ctx);
+    const o2 = new Obstacle(CONFIG.W - 260, 'short');
+    o2.draw(ctx);
+
+    ctx.textAlign = 'left';
+  }
+
+  _drawGameOver(ctx) {
+    const { W, H } = CONFIG;
+
+    ctx.fillStyle = 'rgba(0,0,0,0.60)';
+    ctx.fillRect(0, 0, W, H);
+
+    ctx.textAlign = 'center';
+
+    ctx.font = 'bold 66px monospace';
+    ctx.fillStyle   = '#ff3355';
+    ctx.shadowColor = '#ff3355';
+    ctx.shadowBlur  = 30;
+    ctx.fillText('GAME OVER', W / 2, H / 2 - 52);
+    ctx.shadowBlur = 0;
+
+    ctx.font = 'bold 24px monospace';
+    ctx.fillStyle = CONFIG.COLORS.HUD;
+    ctx.fillText(`SCORE  ${this.score}`, W / 2, H / 2 + 8);
+
+    if (this.newBest) {
+      ctx.font = 'bold 17px monospace';
+      ctx.fillStyle   = '#ffdd44';
+      ctx.shadowColor = '#ffdd44';
+      ctx.shadowBlur  = 12;
+      ctx.fillText('NEW BEST!', W / 2, H / 2 + 44);
+      ctx.shadowBlur = 0;
+    } else if (this.highScore > 0) {
+      ctx.font = '14px monospace';
+      ctx.fillStyle = CONFIG.COLORS.HUD_DIM;
+      ctx.fillText(`BEST  ${this.highScore}`, W / 2, H / 2 + 44);
+    }
+
+    if (this.blinkOn) {
+      ctx.font = 'bold 17px monospace';
+      ctx.fillStyle = '#667788';
+      ctx.fillText('SPACE / TAP TO RESTART', W / 2, H / 2 + 94);
+    }
+
+    ctx.textAlign = 'left';
+  }
+}
+
+// ─────────────────────────────────────────────
+// CANVAS SCALING
+// ─────────────────────────────────────────────
+function scaleCanvas() {
+  const canvas = document.getElementById('gameCanvas');
+  const scale  = Math.min(window.innerWidth / CONFIG.W, window.innerHeight / CONFIG.H);
+  canvas.style.width  = Math.floor(CONFIG.W * scale) + 'px';
+  canvas.style.height = Math.floor(CONFIG.H * scale) + 'px';
+}
+window.addEventListener('resize', scaleCanvas);
+scaleCanvas();
+
+// ─────────────────────────────────────────────
+// BOOT
+// ─────────────────────────────────────────────
+const game = new Game(document.getElementById('gameCanvas'));
+</script>
+</body>
+</html>
