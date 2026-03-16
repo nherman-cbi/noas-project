@@ -277,15 +277,25 @@ class Player {
 }
 
 // ─────────────────────────────────────────────
-// OBSTACLE — NYC street objects
+// OBSTACLE — NYC street objects (10 types)
 // ─────────────────────────────────────────────
 class Obstacle {
-  // type: 'hydrant' | 'newsstand' | 'trash'
   constructor(x, type) {
     this.type = type;
     this.dead = false;
-    const dims = { hydrant: { w: 22, h: 38 }, newsstand: { w: 28, h: 72 }, trash: { w: 60, h: 38 } };
-    const d    = dims[type];
+    const dims = {
+      pizza:      { w: 22, h: 28 },
+      trashcan:   { w: 22, h: 40 },
+      briefcase:  { w: 32, h: 22 },
+      apple:      { w: 24, h: 30 },
+      subway:     { w: 48, h: 58 },
+      skyscraper: { w: 20, h: 65 },
+      taxi:       { w: 66, h: 36 },
+      uber:       { w: 64, h: 32 },
+      nypd:       { w: 22, h: 46 },
+      human:      { w: 18, h: 44 },
+    };
+    const d = dims[type];
     this.w = d.w; this.h = d.h;
     this.x = x;
     this.y = CONFIG.GROUND_Y - this.h;
@@ -295,145 +305,434 @@ class Obstacle {
     if (this.x + this.w < -20) this.dead = true;
   }
   draw(ctx) {
-    if (this.type === 'hydrant')   this._drawHydrant(ctx);
-    else if (this.type === 'newsstand') this._drawNewsstand(ctx);
-    else                                this._drawTrash(ctx);
+    switch (this.type) {
+      case 'pizza':      this._drawPizza(ctx);      break;
+      case 'trashcan':   this._drawTrashcan(ctx);   break;
+      case 'briefcase':  this._drawBriefcase(ctx);  break;
+      case 'apple':      this._drawApple(ctx);      break;
+      case 'subway':     this._drawSubway(ctx);     break;
+      case 'skyscraper': this._drawSkyscraper(ctx); break;
+      case 'taxi':       this._drawTaxi(ctx);       break;
+      case 'uber':       this._drawUber(ctx);       break;
+      case 'nypd':       this._drawNYPD(ctx);       break;
+      case 'human':      this._drawHuman(ctx);      break;
+    }
   }
 
-  _drawHydrant(ctx) {
+  _drawPizza(ctx) {
     const { x, y } = this;
-    const C = CONFIG.COLORS;
-    // Drop shadow
-    ctx.fillStyle = 'rgba(0,0,0,0.30)';
-    ctx.fillRect(x + 3, y + 3, 22, 38);
-    // Base (widest)
-    ctx.fillStyle = C.HYDRANT;
-    ctx.fillRect(x, y + 25, 22, 13);
-    ctx.fillStyle = C.HYDRANT_DARK;
-    ctx.fillRect(x + 2, y + 27, 18, 10);
-    // Body
-    ctx.fillStyle = C.HYDRANT;
-    ctx.fillRect(x + 1, y + 9, 20, 16);
-    ctx.fillStyle = C.HYDRANT_DARK;
-    ctx.fillRect(x + 3, y + 11, 16, 12);
-    // Side nozzles
-    ctx.fillStyle = C.HYDRANT;
-    ctx.fillRect(x - 3, y + 13, 5, 6);
-    ctx.fillRect(x + 20, y + 13, 5, 6);
-    ctx.fillStyle = C.HYDRANT_CAP;
-    ctx.fillRect(x - 3, y + 14, 3, 4);
-    ctx.fillRect(x + 22, y + 14, 3, 4);
-    // Neck
-    ctx.fillStyle = C.HYDRANT;
-    ctx.fillRect(x + 5, y + 5, 12, 4);
-    // Cap
-    ctx.fillStyle = C.HYDRANT_CAP;
-    ctx.fillRect(x + 4, y, 14, 6);
-    ctx.fillStyle = '#888';
-    ctx.fillRect(x + 7, y + 1, 8, 4);
-    // Chain bolt
-    ctx.fillStyle = '#666';
-    ctx.fillRect(x + 10, y + 6, 2, 3);
-    // Highlight
-    ctx.fillStyle = 'rgba(255,120,80,0.30)';
-    ctx.fillRect(x + 1, y + 9, 3, 16);
-  }
-
-  _drawNewsstand(ctx) {
-    const { x, y } = this;
-    const C = CONFIG.COLORS;
-    // Drop shadow
-    ctx.fillStyle = 'rgba(0,0,0,0.30)';
-    ctx.fillRect(x + 3, y + 3, 28, 72);
-    // Main body
-    ctx.fillStyle = C.NEWSSTAND;
-    ctx.fillRect(x, y + 4, 28, 60);
-    // Roof overhang
-    ctx.fillStyle = '#1e2e1e';
-    ctx.fillRect(x - 3, y, 34, 6);
-    // Yellow front display panel
-    ctx.fillStyle = C.NEWSSTAND_FT;
-    ctx.fillRect(x + 3, y + 8, 22, 34);
-    // Newspaper stack lines
-    ctx.fillStyle = '#fff';
-    ctx.fillRect(x + 5, y + 10, 18, 2);
-    ctx.fillStyle = '#ccc';
-    ctx.fillRect(x + 5, y + 13, 18, 1);
-    ctx.fillRect(x + 5, y + 15, 12, 1);
-    ctx.fillStyle = '#fff';
-    ctx.fillRect(x + 5, y + 19, 18, 2);
-    ctx.fillStyle = '#ccc';
-    ctx.fillRect(x + 5, y + 22, 18, 1);
-    ctx.fillRect(x + 5, y + 24, 12, 1);
-    // Headline band (red)
-    ctx.fillStyle = '#dd2200';
-    ctx.fillRect(x + 5, y + 28, 18, 5);
-    ctx.fillStyle = '#fff';
-    ctx.fillRect(x + 6, y + 30, 14, 2);
-    ctx.fillStyle = '#fff';
-    ctx.fillRect(x + 5, y + 35, 18, 2);
-    // Lower metal section
-    ctx.fillStyle = '#1a281a';
-    ctx.fillRect(x + 3, y + 44, 22, 16);
-    ctx.fillStyle = '#333';
-    ctx.fillRect(x + 7, y + 47, 14, 3);
-    ctx.fillRect(x + 7, y + 53, 14, 4);
-    // Legs
-    ctx.fillStyle = '#111';
-    ctx.fillRect(x + 3, y + 60, 8,  12);
-    ctx.fillRect(x + 17, y + 60, 8, 12);
-    // Top sign
-    ctx.fillStyle = '#bb7700';
-    ctx.fillRect(x + 1, y - 6, 26, 8);
-    ctx.fillStyle = '#ffe060';
-    ctx.fillRect(x + 3, y - 5, 22, 2);
-    ctx.fillRect(x + 3, y - 2, 16, 2);
-    // Highlight
-    ctx.fillStyle = 'rgba(255,240,80,0.15)';
-    ctx.fillRect(x + 3, y + 8, 4, 34);
-  }
-
-  _drawTrash(ctx) {
-    const { x, y } = this;
-    const C = CONFIG.COLORS;
-    // Drop shadow
     ctx.fillStyle = 'rgba(0,0,0,0.28)';
-    ctx.fillRect(x + 4, y + 4, 60, 38);
+    ctx.fillRect(x + 3, y + 3, 22, 28);
+    // Crust (wide base)
+    ctx.fillStyle = '#c07020';
+    ctx.fillRect(x + 2, y + 20, 18, 8);
+    ctx.fillStyle = '#a05010';
+    ctx.fillRect(x + 2, y + 23, 18, 4);
+    // Cheese (triangular taper via stacked rects)
+    ctx.fillStyle = '#f0c040';
+    ctx.fillRect(x + 3, y + 13, 16, 8);
+    ctx.fillRect(x + 5, y + 7,  12, 7);
+    ctx.fillRect(x + 7, y + 2,   8, 6);
+    ctx.fillRect(x + 9, y,       4, 3);
+    // Sauce
+    ctx.fillStyle = '#c01810';
+    ctx.fillRect(x + 4,  y + 14, 4, 3);
+    ctx.fillRect(x + 12, y + 15, 3, 3);
+    ctx.fillRect(x + 7,  y + 8,  3, 3);
+    // Pepperoni
+    ctx.fillStyle = '#8a1a0a';
+    ctx.fillRect(x + 5,  y + 13, 4, 4);
+    ctx.fillRect(x + 12, y + 14, 4, 4);
+    ctx.fillRect(x + 8,  y + 7,  4, 4);
+    // Highlight
+    ctx.fillStyle = 'rgba(255,220,80,0.22)';
+    ctx.fillRect(x + 9, y + 3, 2, 10);
+  }
 
-    // Back bag
-    ctx.fillStyle = '#283420';
-    ctx.fillRect(x + 34, y + 4, 26, 34);
-    ctx.fillStyle = '#1c2416';
-    ctx.fillRect(x + 36, y + 6, 22, 28);
+  _drawTrashcan(ctx) {
+    const { x, y } = this;
+    ctx.fillStyle = 'rgba(0,0,0,0.28)';
+    ctx.fillRect(x + 3, y + 3, 22, 40);
+    // Body
+    ctx.fillStyle = '#484852';
+    ctx.fillRect(x + 2, y + 10, 18, 30);
+    ctx.fillStyle = '#333338';
+    ctx.fillRect(x + 14, y + 10, 6, 30);
+    // Ridges
+    ctx.fillStyle = '#3a3a44';
+    ctx.fillRect(x + 5,  y + 10, 2, 30);
+    ctx.fillRect(x + 10, y + 10, 2, 30);
+    ctx.fillRect(x + 15, y + 10, 2, 30);
+    // Base ring
+    ctx.fillStyle = '#3a3a44';
+    ctx.fillRect(x + 1, y + 36, 20, 4);
+    // Lid
+    ctx.fillStyle = '#2e2e34';
+    ctx.fillRect(x, y + 5, 22, 7);
+    ctx.fillStyle = '#252530';
+    ctx.fillRect(x + 1, y + 6, 20, 4);
+    // Handle
+    ctx.fillStyle = '#555560';
+    ctx.fillRect(x + 8, y + 3, 6, 3);
+    ctx.fillRect(x + 9, y + 1, 4, 3);
+    // Highlight
+    ctx.fillStyle = 'rgba(200,200,220,0.10)';
+    ctx.fillRect(x + 3, y + 11, 3, 24);
+  }
 
-    // Middle bag
-    ctx.fillStyle = '#242e1c';
-    ctx.fillRect(x + 16, y + 2, 28, 36);
-    ctx.fillStyle = '#192016';
-    ctx.fillRect(x + 18, y + 4, 24, 29);
+  _drawBriefcase(ctx) {
+    const { x, y } = this;
+    ctx.fillStyle = 'rgba(0,0,0,0.28)';
+    ctx.fillRect(x + 3, y + 3, 32, 22);
+    // Body
+    ctx.fillStyle = '#7a5030';
+    ctx.fillRect(x, y + 6, 32, 16);
+    ctx.fillStyle = '#5a3820';
+    ctx.fillRect(x + 20, y + 6, 12, 16);
+    // Center clasp
+    ctx.fillStyle = '#c8a850';
+    ctx.fillRect(x + 13, y + 10, 6, 8);
+    ctx.fillStyle = '#a88030';
+    ctx.fillRect(x + 14, y + 11, 4, 6);
+    // Horizontal seam
+    ctx.fillStyle = '#3a2010';
+    ctx.fillRect(x + 1, y + 13, 30, 1);
+    // Stitching
+    ctx.fillStyle = '#9a6840';
+    ctx.fillRect(x + 1, y + 7, 1, 13);
+    ctx.fillRect(x + 30, y + 7, 1, 13);
+    // Handle
+    ctx.fillStyle = '#5a3820';
+    ctx.fillRect(x + 9, y + 1, 14, 3);
+    ctx.fillRect(x + 9, y + 3, 3, 3);
+    ctx.fillRect(x + 20, y + 3, 3, 3);
+    ctx.fillStyle = '#8a6040';
+    ctx.fillRect(x + 10, y + 2, 12, 2);
+    // Highlight
+    ctx.fillStyle = 'rgba(255,200,120,0.15)';
+    ctx.fillRect(x + 1, y + 7, 4, 12);
+  }
 
-    // Front bag
-    ctx.fillStyle = '#2a3420';
-    ctx.fillRect(x, y + 6, 26, 32);
-    ctx.fillStyle = '#1e2818';
-    ctx.fillRect(x + 2, y + 8, 22, 26);
+  _drawApple(ctx) {
+    const { x, y } = this;
+    ctx.fillStyle = 'rgba(0,0,0,0.28)';
+    ctx.fillRect(x + 3, y + 5, 24, 26);
+    // Body (red, rounded via layered rects)
+    ctx.fillStyle = '#cc1a22';
+    ctx.fillRect(x + 3, y + 5,  18, 20);
+    ctx.fillRect(x + 1, y + 8,  22, 14);
+    ctx.fillRect(x + 4, y + 3,  16,  4);
+    ctx.fillRect(x + 5, y + 23, 14,  4);
+    // Darker right shading
+    ctx.fillStyle = '#991420';
+    ctx.fillRect(x + 16, y + 6, 5, 18);
+    // Stem
+    ctx.fillStyle = '#5a3010';
+    ctx.fillRect(x + 10, y,  3, 5);
+    ctx.fillRect(x + 11, y - 2, 2, 3);
+    // Leaf
+    ctx.fillStyle = '#228822';
+    ctx.fillRect(x + 13, y + 1, 7, 3);
+    ctx.fillRect(x + 14, y,     5, 2);
+    ctx.fillRect(x + 17, y + 3, 3, 2);
+    // Highlight
+    ctx.fillStyle = 'rgba(255,180,180,0.35)';
+    ctx.fillRect(x + 5, y + 6, 4, 7);
+    ctx.fillRect(x + 7, y + 4, 3, 4);
+  }
 
-    // Tie knots (white)
-    const drawTie = (tx, ty) => {
-      ctx.fillStyle = '#cccccc';
-      ctx.fillRect(tx, ty, 8, 4);
-      ctx.fillStyle = '#888';
-      ctx.fillRect(tx + 2, ty + 1, 4, 2);
-    };
-    drawTie(x + 8,  y + 4);    // front bag
-    drawTie(x + 26, y);         // middle bag
-    drawTie(x + 43, y + 2);     // back bag
+  _drawSubway(ctx) {
+    const { x, y } = this;
+    ctx.fillStyle = 'rgba(0,0,0,0.30)';
+    ctx.fillRect(x + 3, y + 3, 48, 58);
+    // Base platform
+    ctx.fillStyle = '#303038';
+    ctx.fillRect(x, y + 50, 48, 8);
+    ctx.fillStyle = '#444450';
+    ctx.fillRect(x, y + 50, 48, 3);
+    // Left post (NYC subway green)
+    ctx.fillStyle = '#1a6020';
+    ctx.fillRect(x + 4, y + 8, 5, 44);
+    ctx.fillStyle = '#226828';
+    ctx.fillRect(x + 5, y + 9, 3, 40);
+    // Right post
+    ctx.fillStyle = '#1a6020';
+    ctx.fillRect(x + 39, y + 8, 5, 44);
+    ctx.fillStyle = '#226828';
+    ctx.fillRect(x + 40, y + 9, 3, 40);
+    // Globe left
+    ctx.fillStyle = '#1a6020';
+    ctx.fillRect(x + 1, y + 2, 14, 10);
+    ctx.fillRect(x + 2, y,     12,  4);
+    ctx.fillRect(x + 3, y + 11, 10, 3);
+    ctx.fillStyle = '#22aa40';
+    ctx.fillRect(x + 3, y + 3, 8, 6);
+    ctx.fillStyle = 'rgba(50,220,80,0.35)';
+    ctx.fillRect(x + 4, y + 3, 3, 4);
+    // Globe right
+    ctx.fillStyle = '#1a6020';
+    ctx.fillRect(x + 33, y + 2, 14, 10);
+    ctx.fillRect(x + 34, y,     12,  4);
+    ctx.fillRect(x + 35, y + 11, 10, 3);
+    ctx.fillStyle = '#22aa40';
+    ctx.fillRect(x + 35, y + 3, 8, 6);
+    ctx.fillStyle = 'rgba(50,220,80,0.35)';
+    ctx.fillRect(x + 36, y + 3, 3, 4);
+    // Horizontal rail
+    ctx.fillStyle = '#1a6020';
+    ctx.fillRect(x + 9, y + 8, 30, 4);
+    ctx.fillStyle = '#226828';
+    ctx.fillRect(x + 9, y + 9, 30, 2);
+    // SUBWAY dot pattern
+    ctx.fillStyle = 'rgba(255,255,255,0.50)';
+    for (let i = 0; i < 6; i++) ctx.fillRect(x + 14 + i * 4, y + 9, 2, 2);
+    // Steps
+    ctx.fillStyle = '#252530';
+    ctx.fillRect(x + 9, y + 36, 30, 5);
+    ctx.fillRect(x + 9, y + 43, 30, 5);
+    ctx.fillStyle = '#333340';
+    ctx.fillRect(x + 9, y + 34, 30, 3);
+    ctx.fillRect(x + 9, y + 41, 30, 3);
+  }
 
-    // Bag sheen highlights
-    ctx.fillStyle = 'rgba(120,150,90,0.13)';
-    ctx.fillRect(x + 2,  y + 8, 4, 20);
-    ctx.fillRect(x + 18, y + 4, 4, 22);
-    ctx.fillRect(x + 36, y + 6, 4, 18);
+  _drawSkyscraper(ctx) {
+    const { x, y } = this;
+    ctx.fillStyle = 'rgba(0,0,0,0.28)';
+    ctx.fillRect(x + 3, y + 3, 20, 65);
+    // Body
+    ctx.fillStyle = '#0d1930';
+    ctx.fillRect(x, y + 15, 20, 50);
+    // Setback
+    ctx.fillStyle = '#0c1728';
+    ctx.fillRect(x + 3, y + 5, 14, 12);
+    // Spire
+    ctx.fillStyle = '#0a1422';
+    ctx.fillRect(x + 7, y,     6, 6);
+    ctx.fillRect(x + 8, y - 4, 4, 5);
+    // Windows
+    const wins = [
+      [2,18,'#ffd86a'],[10,18,'#aad4ff'],[2,26,'#aad4ff'],[10,26,'#ffd86a'],
+      [2,34,'#ffd86a'],[10,34,'#aad4ff'],[2,42,'#aad4ff'],[10,42,'#ffd86a'],
+      [2,50,'#ffd86a'],[10,50,'#aad4ff'],[4, 7,'#aad4ff'],[10, 7,'#ffd86a'],
+    ];
+    for (const [wx,wy,wc] of wins) {
+      ctx.fillStyle = wc;
+      ctx.globalAlpha = 0.55 + Math.random() * 0.2;
+      ctx.fillRect(x + wx, y + wy, 5, 5);
+    }
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = 'rgba(100,160,255,0.10)';
+    ctx.fillRect(x, y + 15, 2, 50);
+    ctx.fillRect(x + 3, y + 5, 2, 12);
+  }
+
+  _drawTaxi(ctx) {
+    const { x, y } = this;
+    ctx.fillStyle = 'rgba(0,0,0,0.30)';
+    ctx.fillRect(x + 3, y + 3, 66, 36);
+    // Wheels
+    ctx.fillStyle = '#111114';
+    ctx.fillRect(x + 6,  y + 26, 14, 10);
+    ctx.fillRect(x + 46, y + 26, 14, 10);
+    ctx.fillStyle = '#333338';
+    ctx.fillRect(x + 8,  y + 28, 10,  6);
+    ctx.fillRect(x + 48, y + 28, 10,  6);
+    ctx.fillStyle = '#888';
+    ctx.fillRect(x + 11, y + 30, 4, 3);
+    ctx.fillRect(x + 51, y + 30, 4, 3);
+    // Body (iconic NYC yellow)
+    ctx.fillStyle = '#f0c000';
+    ctx.fillRect(x + 4, y + 12, 58, 16);
+    ctx.fillStyle = '#c8a000';
+    ctx.fillRect(x + 8, y + 22, 50,  6);
+    // Roof / cab section
+    ctx.fillStyle = '#e8b800';
+    ctx.fillRect(x + 14, y + 4, 36, 10);
+    // Windshields
+    ctx.fillStyle = '#1a2a40';
+    ctx.fillRect(x + 14, y + 5, 12, 8);
+    ctx.fillRect(x + 40, y + 5, 10, 8);
+    ctx.fillRect(x + 27, y + 5, 12, 8);
+    ctx.fillStyle = 'rgba(150,210,255,0.30)';
+    ctx.fillRect(x + 15, y + 6, 4, 5);
+    ctx.fillRect(x + 41, y + 6, 3, 5);
+    ctx.fillRect(x + 28, y + 6, 4, 5);
+    // Taxi sign on roof
+    ctx.fillStyle = '#111';
+    ctx.fillRect(x + 24, y, 16, 6);
+    ctx.fillStyle = '#f0c000';
+    ctx.fillRect(x + 25, y + 1, 14, 4);
+    ctx.fillStyle = '#111';
+    ctx.fillRect(x + 27, y + 1, 10, 4);
+    // Door seam
+    ctx.fillStyle = '#c8a000';
+    ctx.fillRect(x + 33, y + 16, 5, 2);
+    // Headlight / taillight
+    ctx.fillStyle = '#ffffcc';
+    ctx.fillRect(x + 4, y + 13, 5, 5);
+    ctx.fillStyle = '#ff3300';
+    ctx.fillRect(x + 57, y + 13, 5, 5);
+    // Highlight
+    ctx.fillStyle = 'rgba(255,240,100,0.20)';
+    ctx.fillRect(x + 5, y + 13, 4, 8);
+  }
+
+  _drawUber(ctx) {
+    const { x, y } = this;
+    ctx.fillStyle = 'rgba(0,0,0,0.30)';
+    ctx.fillRect(x + 3, y + 3, 64, 32);
+    // Wheels
+    ctx.fillStyle = '#0a0a0c';
+    ctx.fillRect(x + 6,  y + 22, 14, 10);
+    ctx.fillRect(x + 44, y + 22, 14, 10);
+    ctx.fillStyle = '#252528';
+    ctx.fillRect(x + 8,  y + 24, 10, 6);
+    ctx.fillRect(x + 46, y + 24, 10, 6);
+    ctx.fillStyle = '#555560';
+    ctx.fillRect(x + 10, y + 26, 6, 3);
+    ctx.fillRect(x + 48, y + 26, 6, 3);
+    // Body (sleek black)
+    ctx.fillStyle = '#18181e';
+    ctx.fillRect(x + 4, y + 10, 56, 14);
+    ctx.fillStyle = '#111114';
+    ctx.fillRect(x + 8, y + 20, 48,  4);
+    // Roof
+    ctx.fillStyle = '#141418';
+    ctx.fillRect(x + 12, y + 3, 38, 8);
+    // Windows (tinted)
+    ctx.fillStyle = '#0a1828';
+    ctx.fillRect(x + 12, y + 4, 11, 7);
+    ctx.fillRect(x + 38, y + 4, 10, 7);
+    ctx.fillRect(x + 24, y + 4, 13, 7);
+    ctx.fillStyle = 'rgba(80,140,200,0.20)';
+    ctx.fillRect(x + 13, y + 5, 4, 4);
+    ctx.fillRect(x + 39, y + 5, 3, 4);
+    // Uber "U" logo hint
+    ctx.fillStyle = '#333340';
+    ctx.fillRect(x + 28, y + 5, 4, 5);
+    ctx.fillStyle = '#555565';
+    ctx.fillRect(x + 28, y + 5, 4, 1);
+    ctx.fillRect(x + 28, y + 5, 1, 4);
+    ctx.fillRect(x + 31, y + 5, 1, 4);
+    // Headlight (blue-white)
+    ctx.fillStyle = '#d0e4ff';
+    ctx.fillRect(x + 4, y + 11, 5, 4);
+    ctx.fillStyle = 'rgba(180,210,255,0.50)';
+    ctx.fillRect(x + 3, y + 10, 7, 6);
+    // Taillight
+    ctx.fillStyle = '#cc1100';
+    ctx.fillRect(x + 55, y + 11, 5, 4);
+    // Highlight
+    ctx.fillStyle = 'rgba(100,140,200,0.08)';
+    ctx.fillRect(x + 5, y + 11, 3, 8);
+  }
+
+  _drawNYPD(ctx) {
+    const { x, y } = this;
+    const C = CONFIG.COLORS;
+    ctx.fillStyle = 'rgba(0,0,0,0.28)';
+    ctx.fillRect(x + 3, y + 3, 22, 46);
+    // Legs
+    ctx.fillStyle = '#0f1e50';
+    ctx.fillRect(x + 3,  y + 32, 7, 14);
+    ctx.fillRect(x + 12, y + 32, 7, 14);
+    // Shoes
+    ctx.fillStyle = '#111114';
+    ctx.fillRect(x + 2,  y + 42, 9, 4);
+    ctx.fillRect(x + 11, y + 42, 9, 4);
+    // Belt
+    ctx.fillStyle = '#0d1840';
+    ctx.fillRect(x + 2, y + 30, 18, 3);
+    ctx.fillStyle = '#c8a020';
+    ctx.fillRect(x + 8, y + 30, 6, 3);
+    // Uniform (NYPD blue)
+    ctx.fillStyle = '#1a2e6e';
+    ctx.fillRect(x + 2, y + 14, 18, 18);
+    // Badge
+    ctx.fillStyle = '#c8a020';
+    ctx.fillRect(x + 5, y + 17, 6, 6);
+    ctx.fillStyle = '#a88000';
+    ctx.fillRect(x + 6, y + 18, 4, 4);
+    ctx.fillStyle = '#ffe060';
+    ctx.fillRect(x + 7, y + 19, 2, 2);
+    // Epaulettes
+    ctx.fillStyle = '#0d1840';
+    ctx.fillRect(x + 2,  y + 14, 4, 4);
+    ctx.fillRect(x + 16, y + 14, 4, 4);
+    // Arms
+    ctx.fillStyle = '#1a2e6e';
+    ctx.fillRect(x,      y + 15, 3, 10);
+    ctx.fillRect(x + 19, y + 15, 3, 10);
+    ctx.fillStyle = C.PLAYER_SKIN;
+    ctx.fillRect(x - 1,  y + 24, 4, 4);
+    ctx.fillRect(x + 19, y + 24, 4, 4);
+    // Neck & head
+    ctx.fillStyle = C.PLAYER_SKIN;
+    ctx.fillRect(x + 9, y + 11, 4, 4);
+    ctx.fillRect(x + 5, y + 3,  12, 10);
+    // Eyes
+    ctx.fillStyle = '#332200';
+    ctx.fillRect(x + 7, y + 6, 2, 2);
+    ctx.fillRect(x + 13, y + 6, 2, 2);
+    // Cap (NYPD flat-top)
+    ctx.fillStyle = '#0f1e50';
+    ctx.fillRect(x + 2, y,     18, 5);
+    ctx.fillRect(x + 4, y - 4, 14, 5);
+    ctx.fillStyle = '#1a2e6e';
+    ctx.fillRect(x + 5, y - 3, 12, 4);
+    // Cap badge
+    ctx.fillStyle = '#c8a020';
+    ctx.fillRect(x + 9, y - 2, 4, 3);
+    // Highlight
+    ctx.fillStyle = 'rgba(100,140,255,0.10)';
+    ctx.fillRect(x + 3, y + 15, 3, 14);
+  }
+
+  _drawHuman(ctx) {
+    const { x, y } = this;
+    ctx.fillStyle = 'rgba(0,0,0,0.28)';
+    ctx.fillRect(x + 2, y + 3, 18, 44);
+    // Legs (dark trousers)
+    ctx.fillStyle = '#2a2a38';
+    ctx.fillRect(x + 2,  y + 28, 6, 16);
+    ctx.fillRect(x + 10, y + 28, 6, 16);
+    // Shoes
+    ctx.fillStyle = '#111114';
+    ctx.fillRect(x + 1, y + 40, 8, 4);
+    ctx.fillRect(x + 9, y + 40, 8, 4);
+    // Business coat
+    ctx.fillStyle = '#303038';
+    ctx.fillRect(x + 1, y + 12, 16, 18);
+    // Shirt collar
+    ctx.fillStyle = '#e8e8e0';
+    ctx.fillRect(x + 7, y + 12, 4, 3);
+    // Tie
+    ctx.fillStyle = '#bb2020';
+    ctx.fillRect(x + 8, y + 14, 2, 8);
+    // Neck & head
+    ctx.fillStyle = '#e8c090';
+    ctx.fillRect(x + 7, y + 9, 4, 4);
+    ctx.fillRect(x + 4, y + 1, 10, 10);
+    // Hair
+    ctx.fillStyle = '#2a1800';
+    ctx.fillRect(x + 3, y,     12, 4);
+    ctx.fillRect(x + 3, y + 4,  2, 4);
+    // Eyes
+    ctx.fillStyle = '#332200';
+    ctx.fillRect(x + 6, y + 4, 2, 2);
+    ctx.fillRect(x + 10, y + 4, 2, 2);
+    // Right arm — holding phone
+    ctx.fillStyle = '#303038';
+    ctx.fillRect(x + 15, y + 13, 3, 9);
+    ctx.fillStyle = '#111114';
+    ctx.fillRect(x + 14, y + 20, 5, 8);
+    ctx.fillStyle = '#2244aa';
+    ctx.fillRect(x + 15, y + 21, 3, 5);
+    // Left arm
+    ctx.fillStyle = '#303038';
+    ctx.fillRect(x, y + 13, 3, 8);
+    ctx.fillStyle = '#e8c090';
+    ctx.fillRect(x - 1, y + 20, 4, 4);
   }
 }
 
@@ -674,11 +973,12 @@ class Game {
   }
 
   _spawnObstacle() {
-    const roll = Math.random();
-    let type;
-    if (roll < 0.45)      type = 'hydrant';
-    else if (roll < 0.75) type = 'newsstand';
-    else                  type = 'trash';
+    // Weighted spawn: pizza 12, trashcan 12, briefcase 10, apple 10,
+    //                 subway 8, skyscraper 7, taxi 12, uber 11, nypd 9, human 9
+    const types   = ['pizza','trashcan','briefcase','apple','subway','skyscraper','taxi','uber','nypd','human'];
+    const weights = [0.12,   0.12,      0.10,       0.10,   0.08,   0.07,        0.12,  0.11,  0.09,  0.09];
+    let r = Math.random(), cum = 0, type = types[0];
+    for (let i = 0; i < types.length; i++) { cum += weights[i]; if (r < cum) { type = types[i]; break; } }
     this.obstacles.push(new Obstacle(CONFIG.W + 20, type));
   }
 
@@ -879,12 +1179,14 @@ class Game {
     }
 
     // Decorative obstacles on the right
-    const o1 = new Obstacle(CONFIG.W - 120, 'newsstand');
+    const o1 = new Obstacle(CONFIG.W - 100, 'taxi');
     o1.draw(ctx);
-    const o2 = new Obstacle(CONFIG.W - 230, 'hydrant');
+    const o2 = new Obstacle(CONFIG.W - 220, 'nypd');
     o2.draw(ctx);
-    const o3 = new Obstacle(CONFIG.W - 360, 'trash');
+    const o3 = new Obstacle(CONFIG.W - 300, 'pizza');
     o3.draw(ctx);
+    const o4 = new Obstacle(CONFIG.W - 380, 'subway');
+    o4.draw(ctx);
 
     ctx.textAlign = 'left';
   }
