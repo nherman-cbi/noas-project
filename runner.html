@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Endless Runner</title>
+  <title>NYC Rush</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      background: #0a0a0f;
+      background: #070b18;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -36,99 +36,85 @@ const CONFIG = {
   GRAVITY: 2100,
   INIT_SPEED: 300,
   MAX_SPEED: 820,
-  SPEED_RAMP: 11,        // px/s gained per second
-  OBS_GAP_START: 1.25,   // seconds between obstacles at start
-  OBS_GAP_MIN: 0.52,     // minimum gap at max speed
+  SPEED_RAMP: 11,
+  OBS_GAP_START: 1.25,
+  OBS_GAP_MIN: 0.52,
   COLORS: {
-    BG:            '#0d0d14',
-    DOT:           '#1a1a28',
-    GROUND_FILL:   '#0b0e1a',
-    GROUND_TOP:    '#2a3a5a',
-    GROUND_DASH:   '#151e30',
-    PLAYER_BODY:   '#00ffee',
-    PLAYER_SKIN:   '#ffcc99',
-    PLAYER_LEGS:   '#2244aa',
-    OBSTACLE:      '#ff3355',
-    OBSTACLE_DARK: '#8c0a22',
-    OBSTACLE_TRIM: '#ff6680',
-    CLOUD:         '#181e32',
-    HUD:           '#ccffee',
-    HUD_DIM:       '#3a5545',
-    TITLE:         '#00ffee',
-    SUBTITLE:      '#88ffdd',
-    SCORE_FLASH:   '#ffdd44',
-    PARTICLE_A:    '#00ffee',
-    PARTICLE_B:    '#ffcc99',
-    PARTICLE_C:    '#2244aa',
+    BG:             '#070b18',
+    PLAYER_HAIR:    '#3d2200',
+    PLAYER_SKIN:    '#f4c49a',
+    PLAYER_TEE:     '#eeeeec',
+    PLAYER_JEANS:   '#1a3d8a',
+    PLAYER_SHOES:   '#222226',
+    PLAYER_GLASS:   '#111111',
+    HYDRANT:        '#e03320',
+    HYDRANT_DARK:   '#8c1a0a',
+    HYDRANT_CAP:    '#c8c8c8',
+    NEWSSTAND:      '#2a3a2a',
+    NEWSSTAND_FT:   '#e8c820',
+    TRASHBAG:       '#1e2a18',
+    SIDEWALK:       '#272730',
+    SIDEWALK_LINE:  '#323240',
+    CURB:           '#7a7d90',
+    HUD:            '#ffe8a0',
+    HUD_DIM:        '#5a5040',
+    TITLE:          '#ffe42a',
+    SUBTITLE:       '#ffbb44',
+    SCORE_FLASH:    '#ff6622',
+    PARTICLE_A:     '#eeeeec',
+    PARTICLE_B:     '#f4c49a',
+    PARTICLE_C:     '#1a3d8a',
   },
 };
 
+// Billboard palette for NYC signs
+const BILLBOARD_COLORS = ['#ff1a44','#ffe000','#00aaff','#ff6600','#cc00ff','#00dd55','#ff44aa'];
+
 // ─────────────────────────────────────────────
-// AUDIO
+// AUDIO  (unchanged)
 // ─────────────────────────────────────────────
 class AudioManager {
   constructor() { this.ctx = null; this.ready = false; }
-
   init() {
     if (this.ready) return;
-    try {
-      this.ctx = new (window.AudioContext || window.webkitAudioContext)();
-      this.ready = true;
-    } catch(e) {}
+    try { this.ctx = new (window.AudioContext || window.webkitAudioContext)(); this.ready = true; } catch(e) {}
   }
-
   _play(type, freq, freqEnd, dur, vol = 0.15) {
     if (!this.ready || !this.ctx) return;
     try {
-      const osc  = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-      osc.connect(gain);
-      gain.connect(this.ctx.destination);
+      const osc = this.ctx.createOscillator(), gain = this.ctx.createGain();
+      osc.connect(gain); gain.connect(this.ctx.destination);
       osc.type = type;
       const t = this.ctx.currentTime;
       osc.frequency.setValueAtTime(freq, t);
       if (freqEnd !== null) osc.frequency.exponentialRampToValueAtTime(freqEnd, t + dur);
       gain.gain.setValueAtTime(vol, t);
       gain.gain.exponentialRampToValueAtTime(0.001, t + dur);
-      osc.start(t);
-      osc.stop(t + dur);
+      osc.start(t); osc.stop(t + dur);
     } catch(e) {}
   }
-
-  jump()   { this._play('square',   280,  520, 0.13, 0.13); }
-  land()   { this._play('sine',     110,   70, 0.08, 0.12); }
-  die()    {
-    this._play('sawtooth', 240,  55, 0.45, 0.22);
-    setTimeout(() => this._play('sawtooth', 170, 40, 0.40, 0.16), 130);
-  }
-  score()  { this._play('sine',     700,  920, 0.14, 0.10); }
-  blip()   { this._play('sine',     480,  640, 0.10, 0.09); }
+  jump()  { this._play('square',   280,  520, 0.13, 0.13); }
+  land()  { this._play('sine',     110,   70, 0.08, 0.12); }
+  die()   { this._play('sawtooth', 240,   55, 0.45, 0.22); setTimeout(() => this._play('sawtooth', 170, 40, 0.40, 0.16), 130); }
+  score() { this._play('sine',     700,  920, 0.14, 0.10); }
+  blip()  { this._play('sine',     480,  640, 0.10, 0.09); }
 }
 
 // ─────────────────────────────────────────────
-// PARTICLE
+// PARTICLE  (unchanged)
 // ─────────────────────────────────────────────
 class Particle {
   constructor(x, y, color) {
-    this.x = x; this.y = y;
-    this.color = color;
-    const a = Math.random() * Math.PI * 2;
-    const s = 55 + Math.random() * 130;
-    this.vx = Math.cos(a) * s;
-    this.vy = Math.sin(a) * s - 90;
+    this.x = x; this.y = y; this.color = color;
+    const a = Math.random() * Math.PI * 2, s = 55 + Math.random() * 130;
+    this.vx = Math.cos(a) * s; this.vy = Math.sin(a) * s - 90;
     this.size = 2 + Math.random() * 4;
-    this.life = 0.45 + Math.random() * 0.45;
-    this.age  = 0;
+    this.life = 0.45 + Math.random() * 0.45; this.age = 0;
   }
-  update(dt) {
-    this.vy += 1400 * dt;
-    this.x  += this.vx * dt;
-    this.y  += this.vy * dt;
-    this.age += dt;
-  }
+  update(dt) { this.vy += 1400 * dt; this.x += this.vx * dt; this.y += this.vy * dt; this.age += dt; }
   draw(ctx) {
     ctx.globalAlpha = Math.max(0, 1 - this.age / this.life);
-    ctx.fillStyle   = this.color;
+    ctx.fillStyle = this.color;
     ctx.fillRect(this.x - this.size / 2, this.y - this.size / 2, this.size, this.size);
     ctx.globalAlpha = 1;
   }
@@ -136,199 +122,415 @@ class Particle {
 }
 
 // ─────────────────────────────────────────────
-// PLAYER
+// PLAYER — woman in her 30s, glasses, long brown hair
 // ─────────────────────────────────────────────
 class Player {
   constructor() {
-    this.x         = CONFIG.PLAYER_X;
-    this.y         = CONFIG.GROUND_Y - CONFIG.PLAYER_H;
-    this.vy        = 0;
-    this.onGround  = true;
-    this.dead      = false;
-    this.walkFrame = 0;
-    this.walkTimer = 0;
-    this.landTimer = 0;   // squat on landing
-    this.deathTimer = 0;
+    this.x = CONFIG.PLAYER_X;
+    this.y = CONFIG.GROUND_Y - CONFIG.PLAYER_H;
+    this.vy = 0; this.onGround = true; this.dead = false;
+    this.walkFrame = 0; this.walkTimer = 0;
+    this.landTimer = 0; this.deathTimer = 0;
   }
-
   jump(audio) {
     if (!this.onGround || this.dead) return;
-    this.vy = CONFIG.JUMP_VEL;
-    this.onGround = false;
-    audio.jump();
+    this.vy = CONFIG.JUMP_VEL; this.onGround = false; audio.jump();
   }
-
   update(dt, audio) {
     if (this.dead) { this.deathTimer += dt; return; }
-
     this.vy += CONFIG.GRAVITY * dt;
     this.y  += this.vy * dt;
-
-    // Land
     const groundTop = CONFIG.GROUND_Y - CONFIG.PLAYER_H;
     if (this.y >= groundTop) {
       const wasAirborne = !this.onGround;
-      this.y        = groundTop;
-      this.vy       = 0;
-      this.onGround = true;
+      this.y = groundTop; this.vy = 0; this.onGround = true;
       if (wasAirborne) { audio.land(); this.landTimer = 0.12; }
     }
-
     if (this.landTimer > 0) this.landTimer -= dt;
-
-    // Walk cycle
     if (this.onGround && this.landTimer <= 0) {
       this.walkTimer += dt;
       if (this.walkTimer > 0.075) { this.walkTimer = 0; this.walkFrame = (this.walkFrame + 1) % 4; }
     }
   }
-
-  // Inset hitbox for fair collisions
   hitsRect(ox, oy, ow, oh) {
-    const px = this.x + 6,  pw = CONFIG.PLAYER_W - 12;
-    const py = this.y + 8,  ph = CONFIG.PLAYER_H - 12;
+    const px = this.x + 6, pw = CONFIG.PLAYER_W - 12;
+    const py = this.y + 8, ph = CONFIG.PLAYER_H - 12;
     return px < ox + ow && px + pw > ox && py < oy + oh && py + ph > oy;
   }
-
   draw(ctx) {
     if (this.dead) {
-      const cx = this.x + CONFIG.PLAYER_W / 2;
-      const cy = this.y + CONFIG.PLAYER_H / 2;
+      const cx = this.x + CONFIG.PLAYER_W / 2, cy = this.y + CONFIG.PLAYER_H / 2;
       ctx.save();
-      ctx.translate(cx, cy);
-      ctx.rotate(this.deathTimer * 9);
-      ctx.translate(-CONFIG.PLAYER_W / 2, -CONFIG.PLAYER_H / 2);
+      ctx.translate(cx, cy); ctx.rotate(this.deathTimer * 9); ctx.translate(-CONFIG.PLAYER_W / 2, -CONFIG.PLAYER_H / 2);
       this._drawBody(ctx, 0, 0);
       ctx.restore();
     } else {
       this._drawBody(ctx, this.x, this.y);
     }
   }
-
   _drawBody(ctx, x, y) {
     const W  = CONFIG.PLAYER_W;
     const H  = CONFIG.PLAYER_H;
-    const sq = this.landTimer > 0 ? 3 : 0;  // squat offset
+    const C  = CONFIG.COLORS;
+    const sq = this.landTimer > 0 ? 2 : 0;
 
-    // Leg animation offsets (stride cycle)
     const strides = [0, 7, 0, -7];
     const lOff    = this.onGround && this.landTimer <= 0 ? strides[this.walkFrame] : 0;
+    const armSwing = -lOff;
 
-    // Legs
-    ctx.fillStyle = CONFIG.COLORS.PLAYER_LEGS;
+    // ── Long brown hair trailing behind (drawn first, behind body) ──
+    ctx.fillStyle = C.PLAYER_HAIR;
+    ctx.fillRect(x - 10, y + 1 + sq,  14, 4);
+    ctx.fillRect(x -  8, y + 5 + sq,  11, 4);
+    ctx.fillRect(x -  6, y + 9 + sq,   9, 4);
+    ctx.fillRect(x -  4, y + 13 + sq,  7, 4);
+    ctx.fillRect(x -  2, y + 17 + sq,  5, 3);
+
+    // ── Jeans (animated legs) ──
+    ctx.fillStyle = C.PLAYER_JEANS;
     ctx.fillRect(x + 4,      y + H - 16 + lOff + sq, 9, 16 - sq);
     ctx.fillRect(x + W - 13, y + H - 16 - lOff + sq, 9, 16 - sq);
 
-    // Body
-    ctx.fillStyle = CONFIG.COLORS.PLAYER_BODY;
-    ctx.fillRect(x + 2, y + 14 + sq, W - 4, H - 30 - sq);
-
-    // Head
-    ctx.fillStyle = CONFIG.COLORS.PLAYER_SKIN;
-    ctx.fillRect(x + 4, y + sq, W - 8, 16);
-
-    // Eyes
-    ctx.fillStyle = '#000';
-    if (this.dead) {
-      // × eyes
-      ctx.fillRect(x + 7,      y + 4 + sq, 2, 2);
-      ctx.fillRect(x + 9,      y + 6 + sq, 2, 2);
-      ctx.fillRect(x + 9,      y + 4 + sq, 2, 2);
-      ctx.fillRect(x + 7,      y + 6 + sq, 2, 2);
-      ctx.fillRect(x + W - 11, y + 4 + sq, 2, 2);
-      ctx.fillRect(x + W - 9,  y + 6 + sq, 2, 2);
-      ctx.fillRect(x + W - 9,  y + 4 + sq, 2, 2);
-      ctx.fillRect(x + W - 11, y + 6 + sq, 2, 2);
+    // ── Sneakers ──
+    ctx.fillStyle = C.PLAYER_SHOES;
+    // foot pointing forward gets a longer shoe
+    if (lOff > 0) {
+      ctx.fillRect(x + 1,      y + H - 5 + sq, 13, 5);
+      ctx.fillRect(x + W - 14, y + H - 5 + sq,  9, 5);
+    } else if (lOff < 0) {
+      ctx.fillRect(x + 3,      y + H - 5 + sq,  9, 5);
+      ctx.fillRect(x + W - 14, y + H - 5 + sq, 13, 5);
     } else {
-      ctx.fillRect(x + 7,      y + 5 + sq, 3, 3);
-      ctx.fillRect(x + W - 10, y + 5 + sq, 3, 3);
+      ctx.fillRect(x + 2,      y + H - 5 + sq, 11, 5);
+      ctx.fillRect(x + W - 13, y + H - 5 + sq, 11, 5);
+    }
+    // White sole stripe
+    ctx.fillStyle = '#cccccc';
+    if (lOff > 0)      { ctx.fillRect(x + 1, y + H - 5 + sq, 13, 2); }
+    else if (lOff < 0) { ctx.fillRect(x + W - 14, y + H - 5 + sq, 13, 2); }
+    else               { ctx.fillRect(x + 2, y + H - 5 + sq, 11, 2); ctx.fillRect(x + W - 13, y + H - 5 + sq, 11, 2); }
+
+    // ── White tee ──
+    ctx.fillStyle = C.PLAYER_TEE;
+    ctx.fillRect(x + 2, y + 15 + sq, W - 4, 13);
+    // Subtle collar
+    ctx.fillStyle = '#ccccc8';
+    ctx.fillRect(x + 10, y + 15 + sq, 8, 2);
+
+    // ── Rear arm (swings opposite legs) ──
+    ctx.fillStyle = C.PLAYER_SKIN;
+    if (!this.onGround && !this.dead) {
+      ctx.fillRect(x - 4, y + 17 + sq, 7, 10);
+    } else {
+      ctx.fillRect(x - 4, y + 17 + sq + Math.round(armSwing * 0.55), 7, 10);
     }
 
-    // Pumping arm while airborne
+    // ── Skin: neck ──
+    ctx.fillStyle = C.PLAYER_SKIN;
+    ctx.fillRect(x + 11, y + 12 + sq, 6, 4);
+
+    // ── Head ──
+    ctx.fillStyle = C.PLAYER_SKIN;
+    ctx.fillRect(x + 5, y + 2 + sq, 18, 13);
+
+    // ── Hair: top cap + left-side curtain ──
+    ctx.fillStyle = C.PLAYER_HAIR;
+    ctx.fillRect(x + 3, y      + sq, 22, 6);   // top cap
+    ctx.fillRect(x + 3, y + 6  + sq,  4, 8);   // left-side curtain (frames face)
+
+    // ── Eyes ──
+    if (!this.dead) {
+      ctx.fillStyle = '#332200';
+      ctx.fillRect(x + 10, y + 7 + sq, 3, 3);
+      ctx.fillRect(x + 17, y + 7 + sq, 3, 3);
+      ctx.fillStyle = 'rgba(255,255,255,0.7)';
+      ctx.fillRect(x + 12, y + 7 + sq, 1, 1);
+      ctx.fillRect(x + 19, y + 7 + sq, 1, 1);
+    } else {
+      ctx.fillStyle = '#330000';
+      ctx.fillRect(x + 9,  y + 6 + sq, 2, 2); ctx.fillRect(x + 11, y + 8 + sq, 2, 2);
+      ctx.fillRect(x + 11, y + 6 + sq, 2, 2); ctx.fillRect(x + 9,  y + 8 + sq, 2, 2);
+      ctx.fillRect(x + 16, y + 6 + sq, 2, 2); ctx.fillRect(x + 18, y + 8 + sq, 2, 2);
+      ctx.fillRect(x + 18, y + 6 + sq, 2, 2); ctx.fillRect(x + 16, y + 8 + sq, 2, 2);
+    }
+
+    // ── Glasses ──
+    ctx.fillStyle = C.PLAYER_GLASS;
+    ctx.fillRect(x + 8,  y + 6 + sq, 6, 5);   // left frame
+    ctx.fillRect(x + 15, y + 6 + sq, 6, 5);   // right frame
+    ctx.fillRect(x + 13, y + 8 + sq, 3, 1);   // bridge
+    ctx.fillRect(x + 3,  y + 7 + sq, 5, 1);   // left temple
+    // Lens tint (blue-ish, subtle)
+    ctx.fillStyle = 'rgba(160,210,255,0.22)';
+    ctx.fillRect(x + 9,  y + 7 + sq, 4, 3);
+    ctx.fillRect(x + 16, y + 7 + sq, 4, 3);
+
+    // ── Front arm ──
+    ctx.fillStyle = C.PLAYER_SKIN;
     if (!this.onGround && !this.dead) {
-      ctx.fillStyle = CONFIG.COLORS.PLAYER_SKIN;
-      const armY = y + 16 + Math.sin(Date.now() / 80) * 4;
-      ctx.fillRect(x - 5, armY, 7, 9);
+      ctx.fillRect(x + W - 2, y + 15 + sq, 7,  9);
+      ctx.fillRect(x + W + 3, y + 13 + sq, 4,  6);
+    } else if (!this.dead) {
+      ctx.fillRect(x + W - 2, y + 17 + sq - Math.round(armSwing * 0.55), 7, 10);
     }
   }
 }
 
 // ─────────────────────────────────────────────
-// OBSTACLE
+// OBSTACLE — NYC street objects
 // ─────────────────────────────────────────────
 class Obstacle {
-  // type: 'short' | 'tall' | 'wide'
+  // type: 'hydrant' | 'newsstand' | 'trash'
   constructor(x, type) {
     this.type = type;
     this.dead = false;
-    const dims = { short: { w: 24, h: 42 }, tall: { w: 24, h: 76 }, wide: { w: 58, h: 42 } };
+    const dims = { hydrant: { w: 22, h: 38 }, newsstand: { w: 28, h: 72 }, trash: { w: 60, h: 38 } };
     const d    = dims[type];
-    this.w = d.w;
-    this.h = d.h;
+    this.w = d.w; this.h = d.h;
     this.x = x;
     this.y = CONFIG.GROUND_Y - this.h;
   }
-
   update(dt, speed) {
     this.x -= speed * dt;
     if (this.x + this.w < -20) this.dead = true;
   }
-
   draw(ctx) {
-    const { x, y, w, h } = this;
+    if (this.type === 'hydrant')   this._drawHydrant(ctx);
+    else if (this.type === 'newsstand') this._drawNewsstand(ctx);
+    else                                this._drawTrash(ctx);
+  }
 
-    // Shadow
-    ctx.fillStyle = 'rgba(0,0,0,0.35)';
-    ctx.fillRect(x + 3, y + 3, w, h);
+  _drawHydrant(ctx) {
+    const { x, y } = this;
+    const C = CONFIG.COLORS;
+    // Drop shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.30)';
+    ctx.fillRect(x + 3, y + 3, 22, 38);
+    // Base (widest)
+    ctx.fillStyle = C.HYDRANT;
+    ctx.fillRect(x, y + 25, 22, 13);
+    ctx.fillStyle = C.HYDRANT_DARK;
+    ctx.fillRect(x + 2, y + 27, 18, 10);
+    // Body
+    ctx.fillStyle = C.HYDRANT;
+    ctx.fillRect(x + 1, y + 9, 20, 16);
+    ctx.fillStyle = C.HYDRANT_DARK;
+    ctx.fillRect(x + 3, y + 11, 16, 12);
+    // Side nozzles
+    ctx.fillStyle = C.HYDRANT;
+    ctx.fillRect(x - 3, y + 13, 5, 6);
+    ctx.fillRect(x + 20, y + 13, 5, 6);
+    ctx.fillStyle = C.HYDRANT_CAP;
+    ctx.fillRect(x - 3, y + 14, 3, 4);
+    ctx.fillRect(x + 22, y + 14, 3, 4);
+    // Neck
+    ctx.fillStyle = C.HYDRANT;
+    ctx.fillRect(x + 5, y + 5, 12, 4);
+    // Cap
+    ctx.fillStyle = C.HYDRANT_CAP;
+    ctx.fillRect(x + 4, y, 14, 6);
+    ctx.fillStyle = '#888';
+    ctx.fillRect(x + 7, y + 1, 8, 4);
+    // Chain bolt
+    ctx.fillStyle = '#666';
+    ctx.fillRect(x + 10, y + 6, 2, 3);
+    // Highlight
+    ctx.fillStyle = 'rgba(255,120,80,0.30)';
+    ctx.fillRect(x + 1, y + 9, 3, 16);
+  }
 
+  _drawNewsstand(ctx) {
+    const { x, y } = this;
+    const C = CONFIG.COLORS;
+    // Drop shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.30)';
+    ctx.fillRect(x + 3, y + 3, 28, 72);
     // Main body
-    ctx.fillStyle = CONFIG.COLORS.OBSTACLE;
-    ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = C.NEWSSTAND;
+    ctx.fillRect(x, y + 4, 28, 60);
+    // Roof overhang
+    ctx.fillStyle = '#1e2e1e';
+    ctx.fillRect(x - 3, y, 34, 6);
+    // Yellow front display panel
+    ctx.fillStyle = C.NEWSSTAND_FT;
+    ctx.fillRect(x + 3, y + 8, 22, 34);
+    // Newspaper stack lines
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(x + 5, y + 10, 18, 2);
+    ctx.fillStyle = '#ccc';
+    ctx.fillRect(x + 5, y + 13, 18, 1);
+    ctx.fillRect(x + 5, y + 15, 12, 1);
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(x + 5, y + 19, 18, 2);
+    ctx.fillStyle = '#ccc';
+    ctx.fillRect(x + 5, y + 22, 18, 1);
+    ctx.fillRect(x + 5, y + 24, 12, 1);
+    // Headline band (red)
+    ctx.fillStyle = '#dd2200';
+    ctx.fillRect(x + 5, y + 28, 18, 5);
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(x + 6, y + 30, 14, 2);
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(x + 5, y + 35, 18, 2);
+    // Lower metal section
+    ctx.fillStyle = '#1a281a';
+    ctx.fillRect(x + 3, y + 44, 22, 16);
+    ctx.fillStyle = '#333';
+    ctx.fillRect(x + 7, y + 47, 14, 3);
+    ctx.fillRect(x + 7, y + 53, 14, 4);
+    // Legs
+    ctx.fillStyle = '#111';
+    ctx.fillRect(x + 3, y + 60, 8,  12);
+    ctx.fillRect(x + 17, y + 60, 8, 12);
+    // Top sign
+    ctx.fillStyle = '#bb7700';
+    ctx.fillRect(x + 1, y - 6, 26, 8);
+    ctx.fillStyle = '#ffe060';
+    ctx.fillRect(x + 3, y - 5, 22, 2);
+    ctx.fillRect(x + 3, y - 2, 16, 2);
+    // Highlight
+    ctx.fillStyle = 'rgba(255,240,80,0.15)';
+    ctx.fillRect(x + 3, y + 8, 4, 34);
+  }
 
-    // Dark inset panel
-    ctx.fillStyle = CONFIG.COLORS.OBSTACLE_DARK;
-    ctx.fillRect(x + 3, y + 3, w - 6, h - 6);
+  _drawTrash(ctx) {
+    const { x, y } = this;
+    const C = CONFIG.COLORS;
+    // Drop shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.28)';
+    ctx.fillRect(x + 4, y + 4, 60, 38);
 
-    // Bright top edge
-    ctx.fillStyle = CONFIG.COLORS.OBSTACLE_TRIM;
-    ctx.fillRect(x, y, w, 3);
-    ctx.fillRect(x, y, 3, h);
+    // Back bag
+    ctx.fillStyle = '#283420';
+    ctx.fillRect(x + 34, y + 4, 26, 34);
+    ctx.fillStyle = '#1c2416';
+    ctx.fillRect(x + 36, y + 6, 22, 28);
 
-    // Detail slots (for tall / wide obstacles)
-    if (h >= 60) {
-      ctx.fillStyle = CONFIG.COLORS.OBSTACLE;
-      for (let slot = 8; slot + 8 < h; slot += 18) {
-        ctx.fillRect(x + 6, y + slot, w - 12, 7);
-      }
-    } else if (w >= 50) {
-      ctx.fillStyle = CONFIG.COLORS.OBSTACLE;
-      ctx.fillRect(x + 8,  y + 8, 14, h - 16);
-      ctx.fillRect(x + w - 22, y + 8, 14, h - 16);
-    }
+    // Middle bag
+    ctx.fillStyle = '#242e1c';
+    ctx.fillRect(x + 16, y + 2, 28, 36);
+    ctx.fillStyle = '#192016';
+    ctx.fillRect(x + 18, y + 4, 24, 29);
+
+    // Front bag
+    ctx.fillStyle = '#2a3420';
+    ctx.fillRect(x, y + 6, 26, 32);
+    ctx.fillStyle = '#1e2818';
+    ctx.fillRect(x + 2, y + 8, 22, 26);
+
+    // Tie knots (white)
+    const drawTie = (tx, ty) => {
+      ctx.fillStyle = '#cccccc';
+      ctx.fillRect(tx, ty, 8, 4);
+      ctx.fillStyle = '#888';
+      ctx.fillRect(tx + 2, ty + 1, 4, 2);
+    };
+    drawTie(x + 8,  y + 4);    // front bag
+    drawTie(x + 26, y);         // middle bag
+    drawTie(x + 43, y + 2);     // back bag
+
+    // Bag sheen highlights
+    ctx.fillStyle = 'rgba(120,150,90,0.13)';
+    ctx.fillRect(x + 2,  y + 8, 4, 20);
+    ctx.fillRect(x + 18, y + 4, 4, 22);
+    ctx.fillRect(x + 36, y + 6, 4, 18);
   }
 }
 
 // ─────────────────────────────────────────────
-// CLOUD (parallax background decoration)
+// BUILDING — Times Square skyline element
 // ─────────────────────────────────────────────
-class Cloud {
-  constructor(x) {
-    this.x     = x;
-    this.y     = 30 + Math.random() * 110;
-    this.w     = 70 + Math.random() * 90;
-    this.h     = 14 + Math.random() * 20;
-    this.parallax = 0.12 + Math.random() * 0.08;
+class Building {
+  constructor(baseX, layer) {
+    this.baseX  = baseX;
+    this.layer  = layer;
+
+    if (layer === 'far') {
+      this.w = 28 + Math.random() * 52;
+      this.h = 65 + Math.random() * 100;
+      this.color = '#0c1326';
+      this.winW = 5;  this.winH = 7;
+      this.winPX = 9; this.winPY = 12;
+    } else {
+      this.w = 55 + Math.random() * 80;
+      this.h = 140 + Math.random() * 160;
+      this.color = '#0d1930';
+      this.winW = 7;  this.winH = 9;
+      this.winPX = 13; this.winPY = 15;
+      // Billboard on roof
+      if (Math.random() > 0.38) {
+        this.billboard = {
+          color: BILLBOARD_COLORS[Math.floor(Math.random() * BILLBOARD_COLORS.length)],
+          w:     Math.round(this.w * (0.5 + Math.random() * 0.45)),
+          h:     Math.round(18 + Math.random() * 22),
+        };
+      }
+    }
+
+    this.y = CONFIG.GROUND_Y - this.h;
+
+    // Pre-generate window grid
+    this.windows = [];
+    const cols = Math.floor((this.w - 6) / this.winPX);
+    const rows = Math.floor((this.h - 8) / this.winPY);
+    for (let c = 0; c < cols; c++) {
+      for (let r = 0; r < rows; r++) {
+        if (Math.random() > 0.28) {
+          this.windows.push({
+            cx:   4 + c * this.winPX,
+            cy:   6 + r * this.winPY,
+            warm: Math.random() > 0.55,
+            lit:  Math.random() > 0.30,
+          });
+        }
+      }
+    }
   }
-  update(dt, speed) {
-    this.x -= speed * this.parallax * dt;
-    if (this.x + this.w < -10) this.x = CONFIG.W + 20 + Math.random() * 200;
-  }
-  draw(ctx) {
-    const { x, y, w, h } = this;
-    ctx.fillStyle = CONFIG.COLORS.CLOUD;
-    ctx.fillRect(x,             y + h * 0.45, w,            h * 0.55);
-    ctx.fillRect(x + w * 0.08,  y,            w * 0.52,     h);
-    ctx.fillRect(x + w * 0.52,  y + h * 0.18, w * 0.42,    h * 0.82);
+
+  draw(ctx, sx) {
+    const { y, w, h } = this;
+
+    // Silhouette
+    ctx.fillStyle = this.color;
+    ctx.fillRect(sx, y, w, h);
+
+    // Windows
+    for (const win of this.windows) {
+      if (!win.lit) continue;
+      const wx = sx + win.cx, wy = y + win.cy;
+      if (wx + this.winW < 0 || wx > CONFIG.W) continue;
+      ctx.fillStyle = win.warm ? '#ffd86a' : '#aad4ff';
+      ctx.globalAlpha = 0.55 + Math.random() * 0.25;
+      ctx.fillRect(wx, wy, this.winW, this.winH);
+      ctx.globalAlpha = 1;
+    }
+
+    // Billboard on roof
+    if (this.billboard) {
+      const bw = this.billboard.w;
+      const bh = this.billboard.h;
+      const bx = sx + (w - bw) / 2;
+      const by = y - bh - 4;
+      if (bx + bw > -10 && bx < CONFIG.W + 10) {
+        // Support poles
+        ctx.fillStyle = '#1a1a22';
+        ctx.fillRect(bx + bw * 0.2 - 1, by + bh, 3, 6);
+        ctx.fillRect(bx + bw * 0.8 - 1, by + bh, 3, 6);
+        // Sign body
+        ctx.fillStyle = this.billboard.color;
+        ctx.fillRect(bx, by, bw, bh);
+        // Sign content (abstract text lines + logo box)
+        ctx.fillStyle = 'rgba(255,255,255,0.40)';
+        ctx.fillRect(bx + 4, by + 4,  bw - 8, 3);
+        ctx.fillRect(bx + 4, by + 10, bw - 8, 6);
+        ctx.fillRect(bx + 4, by + 19, bw * 0.4, 3);
+        // Dark border
+        ctx.fillStyle = 'rgba(0,0,0,0.45)';
+        ctx.fillRect(bx, by, bw, 2);
+        ctx.fillRect(bx, by, 2, bh);
+        ctx.fillRect(bx + bw - 2, by, 2, bh);
+      }
+    }
   }
 }
 
@@ -346,15 +548,21 @@ class Game {
     this.highScore = +(localStorage.getItem('noa_runner_hs') || 0);
     this.newBest   = false;
 
-    this.speed       = CONFIG.INIT_SPEED;
-    this.elapsed     = 0;
-    this.bgOffset    = 0;
-    this.gndOffset   = 0;
+    this.speed    = CONFIG.INIT_SPEED;
+    this.elapsed  = 0;
+    this.gndOffset = 0;
 
     this.player    = null;
     this.obstacles = [];
     this.particles = [];
-    this.clouds    = [];
+
+    // Building parallax layers
+    this.farBuildings  = [];
+    this.nearBuildings = [];
+    this.farOffset     = 0;
+    this.nearOffset    = 0;
+    this.FAR_TOTAL     = 0;
+    this.NEAR_TOTAL    = 0;
 
     this.nextObsIn  = 1.4;
     this.scoreTimer = 0;
@@ -363,56 +571,52 @@ class Game {
     this.shakeTimer = 0;
     this.flashTimer = 0;
 
-    this._initClouds();
+    this._initBuildings();
     this._bindInput();
-
     this._lastTime = 0;
     requestAnimationFrame(t => this._loop(t));
   }
 
-  _initClouds() {
-    for (let i = 0; i < 6; i++) {
-      this.clouds.push(new Cloud(Math.random() * CONFIG.W));
+  _initBuildings() {
+    // Far layer — small distant skyscrapers
+    let fx = 0;
+    while (fx < 2600) {
+      const b = new Building(fx, 'far');
+      this.farBuildings.push(b);
+      fx += b.w + 1 + Math.random() * 4;
     }
+    this.FAR_TOTAL = Math.max(fx, 2600);
+
+    // Near layer — tall mid-ground buildings with billboards
+    let nx = 0;
+    while (nx < 2200) {
+      const b = new Building(nx, 'near');
+      this.nearBuildings.push(b);
+      nx += b.w + 3 + Math.random() * 8;
+    }
+    this.NEAR_TOTAL = Math.max(nx, 2200);
   }
 
   _bindInput() {
     window.addEventListener('keydown', e => {
-      if (e.code === 'Space' || e.code === 'ArrowUp') {
-        e.preventDefault();
-        this._action();
-      }
+      if (e.code === 'Space' || e.code === 'ArrowUp') { e.preventDefault(); this._action(); }
     });
     this.canvas.addEventListener('pointerdown', () => this._action());
   }
 
   _action() {
-    if (this.state === 'MENU') {
-      this.audio.init();
-      this.audio.blip();
-      this._startGame();
-    } else if (this.state === 'GAME_OVER') {
-      this.audio.blip();
-      this._startGame();
-    } else if (this.state === 'PLAYING') {
-      this.player.jump(this.audio);
-    }
+    if (this.state === 'MENU')      { this.audio.init(); this.audio.blip(); this._startGame(); }
+    else if (this.state === 'GAME_OVER') { this.audio.blip(); this._startGame(); }
+    else if (this.state === 'PLAYING')   { this.player.jump(this.audio); }
   }
 
   _startGame() {
-    this.score     = 0;
-    this.speed     = CONFIG.INIT_SPEED;
-    this.elapsed   = 0;
-    this.bgOffset  = 0;
-    this.gndOffset = 0;
-    this.obstacles = [];
-    this.particles = [];
-    this.nextObsIn = 1.4;
-    this.scoreTimer = 0;
-    this.flashTimer = 0;
-    this.newBest   = false;
-    this.player    = new Player();
-    this.state     = 'PLAYING';
+    this.score = 0; this.speed = CONFIG.INIT_SPEED; this.elapsed = 0;
+    this.gndOffset = 0; this.obstacles = []; this.particles = [];
+    this.nextObsIn = 1.4; this.scoreTimer = 0; this.flashTimer = 0;
+    this.newBest = false;
+    this.player = new Player();
+    this.state  = 'PLAYING';
   }
 
   _loop(ts) {
@@ -430,33 +634,26 @@ class Game {
     if (this.shakeTimer > 0) this.shakeTimer -= dt;
     if (this.flashTimer > 0) this.flashTimer -= dt;
 
-    // Clouds always drift
-    for (const c of this.clouds) c.update(dt, this.speed);
+    // Building parallax always scrolls
+    this.farOffset  = (this.farOffset  + this.speed * 0.07 * dt) % this.FAR_TOTAL;
+    this.nearOffset = (this.nearOffset + this.speed * 0.22 * dt) % this.NEAR_TOTAL;
 
     if (this.state !== 'PLAYING') return;
 
-    this.elapsed  += dt;
-    this.bgOffset  = (this.bgOffset  + this.speed * 0.05 * dt * 60) % 32;
-    this.gndOffset = (this.gndOffset + this.speed * dt) % 90;
+    this.elapsed   += dt;
+    this.gndOffset  = (this.gndOffset + this.speed * dt) % 80;
+    this.speed      = Math.min(CONFIG.MAX_SPEED, CONFIG.INIT_SPEED + CONFIG.SPEED_RAMP * this.elapsed);
 
-    // Ramp speed up to max
-    this.speed = Math.min(CONFIG.MAX_SPEED, CONFIG.INIT_SPEED + CONFIG.SPEED_RAMP * this.elapsed);
-
-    // Score: +1 every 0.1 s
+    // Score +1 per 0.1s
     this.scoreTimer += dt;
     if (this.scoreTimer >= 0.1) {
       this.scoreTimer = 0;
       this.score++;
-      if (this.score > 0 && this.score % 50 === 0) {
-        this.audio.score();
-        this.flashTimer = 0.9;
-      }
+      if (this.score > 0 && this.score % 50 === 0) { this.audio.score(); this.flashTimer = 0.9; }
     }
 
-    // Player physics
     this.player.update(dt, this.audio);
 
-    // Obstacle spawning — gap shrinks as speed increases
     this.nextObsIn -= dt;
     if (this.nextObsIn <= 0) {
       this._spawnObstacle();
@@ -465,21 +662,13 @@ class Game {
       this.nextObsIn = gap * (0.75 + Math.random() * 0.65);
     }
 
-    // Move obstacles
     for (const o of this.obstacles) o.update(dt, this.speed);
+    for (const p of this.particles)  p.update(dt);
 
-    // Particles
-    for (const p of this.particles) p.update(dt);
-
-    // Collision check
     for (const o of this.obstacles) {
-      if (!o.dead && this.player.hitsRect(o.x, o.y, o.w, o.h)) {
-        this._killPlayer();
-        return;
-      }
+      if (!o.dead && this.player.hitsRect(o.x, o.y, o.w, o.h)) { this._killPlayer(); return; }
     }
 
-    // Cleanup
     this.obstacles = this.obstacles.filter(o => !o.dead);
     this.particles = this.particles.filter(p => !p.isDead());
   }
@@ -487,29 +676,20 @@ class Game {
   _spawnObstacle() {
     const roll = Math.random();
     let type;
-    if (roll < 0.45)      type = 'short';
-    else if (roll < 0.75) type = 'tall';
-    else                  type = 'wide';
+    if (roll < 0.45)      type = 'hydrant';
+    else if (roll < 0.75) type = 'newsstand';
+    else                  type = 'trash';
     this.obstacles.push(new Obstacle(CONFIG.W + 20, type));
   }
 
   _killPlayer() {
-    this.player.dead = true;
-    this.state       = 'GAME_OVER';
-    this.shakeTimer  = 0.45;
-    this.audio.die();
-
-    // Burst particles in player colors
-    const px = this.player.x + CONFIG.PLAYER_W / 2;
-    const py = this.player.y + CONFIG.PLAYER_H / 2;
+    this.player.dead = true; this.state = 'GAME_OVER';
+    this.shakeTimer  = 0.45; this.audio.die();
+    const px = this.player.x + CONFIG.PLAYER_W / 2, py = this.player.y + CONFIG.PLAYER_H / 2;
     const cols = [CONFIG.COLORS.PARTICLE_A, CONFIG.COLORS.PARTICLE_B, CONFIG.COLORS.PARTICLE_C];
-    for (let i = 0; i < 28; i++) {
-      this.particles.push(new Particle(px, py, cols[i % 3]));
-    }
-
+    for (let i = 0; i < 28; i++) this.particles.push(new Particle(px, py, cols[i % 3]));
     if (this.score > this.highScore) {
-      this.highScore = this.score;
-      this.newBest   = true;
+      this.highScore = this.score; this.newBest = true;
       localStorage.setItem('noa_runner_hs', this.highScore);
     }
   }
@@ -518,38 +698,23 @@ class Game {
   // RENDER
   // ─────────────────────────────────────────────
   render() {
-    const ctx      = this.ctx;
+    const ctx = this.ctx;
     const { W, H } = CONFIG;
 
     ctx.save();
-
-    // Screen shake
     if (this.shakeTimer > 0) {
       const amt = 8 * (this.shakeTimer / 0.45);
       ctx.translate((Math.random() - 0.5) * amt * 2, (Math.random() - 0.5) * amt * 2);
     }
 
-    // Background
-    ctx.fillStyle = CONFIG.COLORS.BG;
-    ctx.fillRect(-10, -10, W + 20, H + 20);
-
-    // Dot grid
-    this._drawDots(ctx);
-
-    // Clouds
-    for (const c of this.clouds) c.draw(ctx);
-
-    // Speed streak lines at high speed
-    this._drawStreaks(ctx);
-
-    // Ground
-    this._drawGround(ctx);
+    this._drawSky(ctx);
+    this._drawBuildings(ctx);
+    this._drawSidewalk(ctx);
 
     if (this.state === 'MENU') {
       this._drawIdlePlayer(ctx);
       this._drawMenu(ctx);
     } else {
-      // Obstacles behind player
       for (const o of this.obstacles) o.draw(ctx);
       if (this.player) this.player.draw(ctx);
       for (const p of this.particles) p.draw(ctx);
@@ -560,59 +725,84 @@ class Game {
     ctx.restore();
   }
 
-  _drawDots(ctx) {
-    const off = Math.floor(this.bgOffset);
-    ctx.fillStyle = CONFIG.COLORS.DOT;
-    for (let x = (off % 32) - 32; x < CONFIG.W + 32; x += 32) {
-      for (let y = -32; y < CONFIG.GROUND_Y; y += 32) {
-        ctx.fillRect(x + (off % 32), y + (off % 32), 2, 2);
-      }
+  _drawSky(ctx) {
+    const { W, GROUND_Y } = CONFIG;
+    // Pre-dawn sky gradient
+    const grad = ctx.createLinearGradient(0, 0, 0, GROUND_Y);
+    grad.addColorStop(0,   '#050910');
+    grad.addColorStop(0.55, '#0a1228');
+    grad.addColorStop(1,   '#152040');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, GROUND_Y + 2);
+
+    // City light glow at horizon
+    const glow = ctx.createLinearGradient(0, GROUND_Y - 70, 0, GROUND_Y);
+    glow.addColorStop(0, 'rgba(255,180,60,0)');
+    glow.addColorStop(1, 'rgba(255,160,40,0.14)');
+    ctx.fillStyle = glow;
+    ctx.fillRect(0, GROUND_Y - 70, W, 70);
+
+    // Subtle Times Square neon color bleed across horizon
+    const neon = ctx.createLinearGradient(0, GROUND_Y - 30, 0, GROUND_Y);
+    neon.addColorStop(0, 'rgba(180,40,255,0)');
+    neon.addColorStop(1, 'rgba(180,40,255,0.07)');
+    ctx.fillStyle = neon;
+    ctx.fillRect(0, GROUND_Y - 30, W, 30);
+  }
+
+  _drawBuildings(ctx) {
+    const { W } = CONFIG;
+
+    // Far layer
+    for (const b of this.farBuildings) {
+      let sx = b.baseX - this.farOffset;
+      if (sx + b.w < -5) sx += this.FAR_TOTAL;
+      if (sx > W + 5) continue;
+      b.draw(ctx, sx);
+    }
+
+    // Near layer (in front of far layer)
+    for (const b of this.nearBuildings) {
+      let sx = b.baseX - this.nearOffset;
+      if (sx + b.w < -5) sx += this.NEAR_TOTAL;
+      if (sx > W + 5) continue;
+      b.draw(ctx, sx);
     }
   }
 
-  _drawStreaks(ctx) {
-    if (this.state !== 'PLAYING') return;
-    const frac = (this.speed - CONFIG.INIT_SPEED) / (CONFIG.MAX_SPEED - CONFIG.INIT_SPEED);
-    if (frac < 0.25) return;
-    const alpha = (frac - 0.25) * 0.18;
-    ctx.globalAlpha = alpha;
-    ctx.fillStyle = CONFIG.COLORS.PLAYER_BODY;
-    const streakCount = Math.floor(frac * 8);
-    for (let i = 0; i < streakCount; i++) {
-      const sy = 160 + i * 22;
-      const sw = 20 + Math.random() * 60;
-      ctx.fillRect(CONFIG.PLAYER_X - sw - 10, sy, sw, 1);
-    }
-    ctx.globalAlpha = 1;
-  }
-
-  _drawGround(ctx) {
+  _drawSidewalk(ctx) {
     const { W, GROUND_Y, H } = CONFIG;
     const off = Math.floor(this.gndOffset);
 
-    // Fill
-    ctx.fillStyle = CONFIG.COLORS.GROUND_FILL;
+    // Concrete fill
+    ctx.fillStyle = CONFIG.COLORS.SIDEWALK;
     ctx.fillRect(0, GROUND_Y, W, H - GROUND_Y);
 
-    // Bright top edge
-    ctx.fillStyle = CONFIG.COLORS.GROUND_TOP;
+    // Bright curb line
+    ctx.fillStyle = CONFIG.COLORS.CURB;
     ctx.fillRect(0, GROUND_Y, W, 3);
 
-    // Scrolling lane dashes
-    ctx.fillStyle = CONFIG.COLORS.GROUND_DASH;
-    for (let x = -(off % 90); x < W + 90; x += 90) {
-      ctx.fillRect(x, GROUND_Y + 16, 45, 2);
+    // Horizontal slab joints (every ~24px vertically, static)
+    ctx.fillStyle = CONFIG.COLORS.SIDEWALK_LINE;
+    for (let row = 1; row <= 2; row++) {
+      ctx.fillRect(0, GROUND_Y + row * 24, W, 1);
+    }
+
+    // Vertical slab joints (scrolling)
+    for (let vx = -(off % 80); vx < W + 80; vx += 80) {
+      ctx.fillRect(vx, GROUND_Y + 3, 1, H - GROUND_Y - 3);
+    }
+
+    // Yellow taxi stripe at curb edge (NYC flavor)
+    ctx.fillStyle = '#ffcc00';
+    for (let sx = -(off % 48); sx < W + 48; sx += 48) {
+      ctx.fillRect(sx, GROUND_Y, 24, 3);
     }
   }
 
   _drawIdlePlayer(ctx) {
-    // Render a static standing player for the menu screen
-    const dummy = {
-      onGround: true, dead: false, landTimer: 0,
-      walkFrame: 0,
-      x: CONFIG.PLAYER_X,
-      y: CONFIG.GROUND_Y - CONFIG.PLAYER_H,
-    };
+    const dummy = { onGround: true, dead: false, landTimer: 0, walkFrame: 0,
+                    x: CONFIG.PLAYER_X, y: CONFIG.GROUND_Y - CONFIG.PLAYER_H };
     Player.prototype._drawBody.call(dummy, ctx, dummy.x, dummy.y);
   }
 
@@ -620,20 +810,16 @@ class Game {
     const { W } = CONFIG;
     const flashing = this.flashTimer > 0 && Math.floor(this.flashTimer * 9) % 2 === 0;
 
-    // Score (top-right)
     ctx.textAlign = 'right';
     ctx.font = 'bold 30px monospace';
     ctx.fillStyle = flashing ? CONFIG.COLORS.SCORE_FLASH : CONFIG.COLORS.HUD;
-    if (flashing) {
-      ctx.shadowColor = CONFIG.COLORS.SCORE_FLASH;
-      ctx.shadowBlur  = 14;
-    }
+    if (flashing) { ctx.shadowColor = CONFIG.COLORS.SCORE_FLASH; ctx.shadowBlur = 14; }
     ctx.fillText(String(this.score).padStart(5, '0'), W - 16, 38);
     ctx.shadowBlur = 0;
 
     ctx.font = '11px monospace';
     ctx.fillStyle = CONFIG.COLORS.HUD_DIM;
-    ctx.fillText('SCORE', W - 16, 54);
+    ctx.fillText('BLOCKS', W - 16, 54);
 
     if (this.highScore > 0) {
       ctx.font = '13px monospace';
@@ -641,16 +827,16 @@ class Game {
       ctx.fillText(`BEST  ${String(this.highScore).padStart(5, '0')}`, W - 16, 74);
     }
 
-    // Speed bar (top-left)
-    const frac  = (this.speed - CONFIG.INIT_SPEED) / (CONFIG.MAX_SPEED - CONFIG.INIT_SPEED);
-    const barW  = 88;
+    // Speed bar
+    const frac = (this.speed - CONFIG.INIT_SPEED) / (CONFIG.MAX_SPEED - CONFIG.INIT_SPEED);
+    const barW = 88;
     ctx.textAlign = 'left';
     ctx.font = '10px monospace';
     ctx.fillStyle = CONFIG.COLORS.HUD_DIM;
-    ctx.fillText('SPD', 16, 26);
-    ctx.fillStyle = '#111827';
+    ctx.fillText('MPH', 16, 26);
+    ctx.fillStyle = '#111';
     ctx.fillRect(16, 30, barW, 7);
-    ctx.fillStyle = frac > 0.8 ? '#ff4466' : frac > 0.45 ? '#ffaa22' : CONFIG.COLORS.PLAYER_BODY;
+    ctx.fillStyle = frac > 0.8 ? '#ff4444' : frac > 0.45 ? '#ffaa22' : '#ffe8a0';
     ctx.fillRect(16, 30, Math.round(barW * frac), 7);
     ctx.strokeStyle = CONFIG.COLORS.HUD_DIM;
     ctx.lineWidth = 1;
@@ -658,28 +844,29 @@ class Game {
   }
 
   _drawMenu(ctx) {
-    const { W, H } = CONFIG;
+    const { W } = CONFIG;
     ctx.textAlign = 'center';
 
+    // Title glow
     ctx.font = 'bold 74px monospace';
     ctx.fillStyle   = CONFIG.COLORS.TITLE;
     ctx.shadowColor = CONFIG.COLORS.TITLE;
-    ctx.shadowBlur  = 32;
-    ctx.fillText('RUNNER', W / 2, 128);
+    ctx.shadowBlur  = 36;
+    ctx.fillText('NYC RUSH', W / 2, 126);
     ctx.shadowBlur = 0;
 
     ctx.font = 'bold 20px monospace';
     ctx.fillStyle = CONFIG.COLORS.SUBTITLE;
-    ctx.fillText('ENDLESS SPRINT', W / 2, 163);
+    ctx.fillText('MORNING COMMUTE', W / 2, 161);
 
     ctx.font = '14px monospace';
-    ctx.fillStyle = '#3a5545';
-    ctx.fillText('SPACE / TAP — JUMP', W / 2, 220);
+    ctx.fillStyle = '#5a5040';
+    ctx.fillText('SPACE / TAP — JUMP', W / 2, 218);
 
     if (this.highScore > 0) {
       ctx.font = 'bold 15px monospace';
       ctx.fillStyle = '#886633';
-      ctx.fillText(`BEST: ${this.highScore}`, W / 2, 256);
+      ctx.fillText(`BEST: ${this.highScore} blocks`, W / 2, 254);
     }
 
     if (this.blinkOn) {
@@ -687,15 +874,17 @@ class Game {
       ctx.fillStyle   = CONFIG.COLORS.TITLE;
       ctx.shadowColor = CONFIG.COLORS.TITLE;
       ctx.shadowBlur  = 14;
-      ctx.fillText('PRESS SPACE OR TAP TO START', W / 2, 308);
+      ctx.fillText('PRESS SPACE OR TAP TO START', W / 2, 306);
       ctx.shadowBlur = 0;
     }
 
-    // Decorative obstacles flanking the player
-    const o1 = new Obstacle(CONFIG.W - 140, 'tall');
+    // Decorative obstacles on the right
+    const o1 = new Obstacle(CONFIG.W - 120, 'newsstand');
     o1.draw(ctx);
-    const o2 = new Obstacle(CONFIG.W - 260, 'short');
+    const o2 = new Obstacle(CONFIG.W - 230, 'hydrant');
     o2.draw(ctx);
+    const o3 = new Obstacle(CONFIG.W - 360, 'trash');
+    o3.draw(ctx);
 
     ctx.textAlign = 'left';
   }
@@ -703,39 +892,43 @@ class Game {
   _drawGameOver(ctx) {
     const { W, H } = CONFIG;
 
-    ctx.fillStyle = 'rgba(0,0,0,0.60)';
+    ctx.fillStyle = 'rgba(0,0,0,0.65)';
     ctx.fillRect(0, 0, W, H);
 
     ctx.textAlign = 'center';
 
     ctx.font = 'bold 66px monospace';
-    ctx.fillStyle   = '#ff3355';
-    ctx.shadowColor = '#ff3355';
+    ctx.fillStyle   = '#ff3344';
+    ctx.shadowColor = '#ff3344';
     ctx.shadowBlur  = 30;
-    ctx.fillText('GAME OVER', W / 2, H / 2 - 52);
+    ctx.fillText('GAME OVER', W / 2, H / 2 - 60);
     ctx.shadowBlur = 0;
+
+    ctx.font = 'bold 18px monospace';
+    ctx.fillStyle = CONFIG.COLORS.SUBTITLE;
+    ctx.fillText('MISSED YOUR TRAIN!', W / 2, H / 2 - 20);
 
     ctx.font = 'bold 24px monospace';
     ctx.fillStyle = CONFIG.COLORS.HUD;
-    ctx.fillText(`SCORE  ${this.score}`, W / 2, H / 2 + 8);
+    ctx.fillText(`${this.score} blocks`, W / 2, H / 2 + 20);
 
     if (this.newBest) {
       ctx.font = 'bold 17px monospace';
       ctx.fillStyle   = '#ffdd44';
       ctx.shadowColor = '#ffdd44';
       ctx.shadowBlur  = 12;
-      ctx.fillText('NEW BEST!', W / 2, H / 2 + 44);
+      ctx.fillText('NEW BEST!', W / 2, H / 2 + 56);
       ctx.shadowBlur = 0;
     } else if (this.highScore > 0) {
       ctx.font = '14px monospace';
       ctx.fillStyle = CONFIG.COLORS.HUD_DIM;
-      ctx.fillText(`BEST  ${this.highScore}`, W / 2, H / 2 + 44);
+      ctx.fillText(`BEST  ${this.highScore} blocks`, W / 2, H / 2 + 56);
     }
 
     if (this.blinkOn) {
       ctx.font = 'bold 17px monospace';
       ctx.fillStyle = '#667788';
-      ctx.fillText('SPACE / TAP TO RESTART', W / 2, H / 2 + 94);
+      ctx.fillText('SPACE / TAP TO TRY AGAIN', W / 2, H / 2 + 100);
     }
 
     ctx.textAlign = 'left';
