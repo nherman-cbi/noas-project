@@ -1040,7 +1040,6 @@ function flipCard(idx) {
     if (flipped[0].id === flipped[1].id) {
       // Match!
       const matchedId = flipped[0].id;
-      const matchTry = tries;
       matched++;
       updateStats();
       setTimeout(() => {
@@ -1053,7 +1052,7 @@ function flipCard(idx) {
         });
         flipped = [];
         locked = false;
-        if (matchedId === 'mila' && matchTry <= 3) {
+        if (matchedId === 'mila') {
           showMilaSpecial(); // win screen (if last pair) fires after dismiss
         } else if (matched === characters.length) {
           showWin();
