@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/>
+  <title>Color It! 🎨</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@700;900&display=swap');
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      min-height: 100vh;
+      background: linear-gradient(135deg, #ffd6e7 0%, #fff8d6 45%, #d6f0ff 100%);
+      font-family: 'Nunito', sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px 16px 32px;
+      overflow-x: hidden;
+    }
+
+    /* ── Selection Screen ─────────────────────────────────── */
+    #select-screen {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 100%;
+    }
+
+    .main-title {
+      font-family: 'Fredoka One', cursive;
+      font-size: clamp(38px, 9vw, 68px);
+      color: #e84393;
+      text-shadow: 3px 3px 0 #ffb3d9, 6px 6px 0 rgba(232,67,147,0.12);
+      text-align: center;
+      margin-bottom: 6px;
+    }
+
+    .main-sub {
+      font-size: clamp(16px, 4vw, 24px);
+      color: #7b5ea7;
+      font-weight: 700;
+      margin-bottom: 28px;
+      text-align: center;
+    }
+
+    .choices {
+      display: flex;
+      gap: clamp(12px, 4vw, 32px);
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .choice-card {
+      background: white;
+      border-radius: 24px;
+      padding: 18px 16px 14px;
+      box-shadow: 0 6px 22px rgba(0,0,0,0.12);
+      cursor: pointer;
+      transition: transform 0.12s, box-shadow 0.12s;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      border: 4px solid transparent;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .choice-card:hover  { transform: scale(1.04); border-color: #ffb3d9; }
+    .choice-card:active { transform: scale(0.96); box-shadow: 0 3px 10px rgba(0,0,0,0.1); border-color: #e84393; }
+
+    .choice-card canvas { display: block; border-radius: 12px; }
+
+    .choice-label {
+      font-family: 'Fredoka One', cursive;
+      font-size: clamp(15px, 3.5vw, 22px);
+      color: #5c3d7a;
+    }
+
+    /* ── Coloring Screen ──────────────────────────────────── */
+    #color-screen {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      width: 100%;
+      gap: 14px;
+    }
+
+    .top-row {
+      display: flex;
+      align-items: center;
+      width: 100%;
+      max-width: 460px;
+    }
+
+    .back-btn {
+      font-family: 'Fredoka One', cursive;
+      font-size: clamp(16px, 4vw, 21px);
+      color: #e84393;
+      background: white;
+      border: 3px solid #e84393;
+      border-radius: 999px;
+      padding: 8px 22px;
+      cursor: pointer;
+      box-shadow: 0 3px 10px rgba(232,67,147,0.22);
+      -webkit-tap-highlight-color: transparent;
+    }
+    .back-btn:active { background: #ffeef7; }
+
+    #main-canvas {
+      max-width: min(92vw, 460px);
+      width: 100%;
+      height: auto;
+      border-radius: 20px;
+      box-shadow: 0 8px 28px rgba(0,0,0,0.15);
+      cursor: crosshair;
+      touch-action: none;
+      user-select: none;
+    }
+
+    /* ── Palette ──────────────────────────────────────────── */
+    #palette {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: center;
+      max-width: 460px;
+    }
+
+    .swatch {
+      width: clamp(46px, 11vw, 58px);
+      height: clamp(46px, 11vw, 58px);
+      border-radius: 50%;
+      border: 4px solid white;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+      cursor: pointer;
+      transition: transform 0.1s, border-color 0.1s, box-shadow 0.1s;
+      -webkit-tap-highlight-color: transparent;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+    }
+
+    .swatch:active { transform: scale(0.88) !important; }
+    .swatch.active {
+      border-color: #222;
+      transform: scale(1.22);
+      box-shadow: 0 5px 18px rgba(0,0,0,0.35);
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Selection Screen ─────────────────────────────────────────────────── -->
+<div id="select-screen">
+  <h1 class="main-title">🎨 Color It!</h1>
+  <p class="main-sub">Pick a picture to color!</p>
+  <div class="choices">
+    <div class="choice-card" onclick="startColoring(0)">
+      <canvas id="t0" width="150" height="169"></canvas>
+      <div class="choice-label">😸 Silly Cat</div>
+    </div>
+    <div class="choice-card" onclick="startColoring(1)">
+      <canvas id="t1" width="150" height="169"></canvas>
+      <div class="choice-label">🐸 Funny Frog</div>
+    </div>
+    <div class="choice-card" onclick="startColoring(2)">
+      <canvas id="t2" width="150" height="169"></canvas>
+      <div class="choice-label">🦕 Goofy Dino</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Coloring Screen ──────────────────────────────────────────────────── -->
+<div id="color-screen">
+  <div class="top-row">
+    <button class="back-btn" onclick="goBack()">← Back</button>
+  </div>
+  <canvas id="main-canvas" width="400" height="450"></canvas>
+  <div id="palette"></div>
+</div>
+
+<script>
+// ─── Palette ──────────────────────────────────────────────────────────────────
+const COLORS = [
+  { hex: '#ff4d4d' },
+  { hex: '#ff9422' },
+  { hex: '#ffe033' },
+  { hex: '#44cc55' },
+  { hex: '#33bbff' },
+  { hex: '#4466ff' },
+  { hex: '#cc44ff' },
+  { hex: '#ff55bb' },
+  { hex: '#a0663a' },
+  { hex: '#ffffff', icon: '🧹' }, // eraser
+];
+
+let selectedColor = COLORS[0].hex;
+
+// ─── Drawing helpers ──────────────────────────────────────────────────────────
+function prep(ctx, lw) {
+  ctx.strokeStyle = '#111';
+  ctx.lineWidth = lw;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+}
+
+function circ(ctx, x, y, r) {
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.stroke();
+}
+
+function oval(ctx, x, y, rx, ry, angle) {
+  ctx.beginPath();
+  ctx.ellipse(x, y, rx, ry, angle || 0, 0, Math.PI * 2);
+  ctx.stroke();
+}
+
+function tri(ctx, x1, y1, x2, y2, x3, y3) {
+  ctx.beginPath();
+  ctx.moveTo(x1, y1);
+  ctx.lineTo(x2, y2);
+  ctx.lineTo(x3, y3);
+  ctx.closePath();
+  ctx.stroke();
+}
+
+// ─── Cat ──────────────────────────────────────────────────────────────────────
+// Coordinate system: 400 × 450. Pass s=1 for full canvas, s≈0.375 for thumbnail.
+function drawCat(ctx, s) {
+  const lw = s < 1 ? 2.5 : 3;
+  prep(ctx, lw);
+
+  // Body + head (they overlap — forms one big fillable area)
+  oval(ctx, 200*s, 347*s, 108*s, 86*s);
+  circ(ctx, 200*s, 172*s, 90*s);
+
+  // Ears (closed triangles)
+  tri(ctx, 132*s,110*s,  112*s,50*s,  180*s,88*s);
+  tri(ctx, 268*s,110*s,  288*s,50*s,  220*s,88*s);
+
+  // Inner ears (smaller triangles — separate fillable region)
+  tri(ctx, 138*s,106*s,  120*s,64*s,  168*s,86*s);
+  tri(ctx, 262*s,106*s,  280*s,64*s,  232*s,86*s);
+
+  // Eyes
+  circ(ctx, 162*s, 160*s, 25*s);
+  circ(ctx, 238*s, 160*s, 25*s);
+
+  // Pupils
+  circ(ctx, 165*s, 163*s, 12*s);
+  circ(ctx, 235*s, 163*s, 12*s);
+
+  // Nose (small triangle)
+  tri(ctx, 200*s,198*s,  191*s,213*s,  209*s,213*s);
+
+  // Smile
+  ctx.beginPath();
+  ctx.arc(200*s, 216*s, 22*s, 0.2, Math.PI - 0.2);
+  ctx.stroke();
+
+  // Whiskers
+  ctx.lineWidth = s < 1 ? 1.5 : 2;
+  [
+    [191,207, 120,194], [190,214, 120,224], [191,200, 126,176],
+    [209,207, 280,194], [210,214, 280,224], [209,200, 274,176],
+  ].forEach(([x1,y1,x2,y2]) => {
+    ctx.beginPath();
+    ctx.moveTo(x1*s, y1*s);
+    ctx.lineTo(x2*s, y2*s);
+    ctx.stroke();
+  });
+  ctx.lineWidth = lw;
+
+  // Belly spot
+  oval(ctx, 200*s, 354*s, 62*s, 50*s);
+
+  // Tail (open, decorative)
+  ctx.beginPath();
+  ctx.moveTo(308*s, 422*s);
+  ctx.bezierCurveTo(380*s,392*s, 400*s,326*s, 372*s,282*s);
+  ctx.bezierCurveTo(355*s,252*s, 328*s,258*s, 336*s,293*s);
+  ctx.stroke();
+}
+
+// ─── Frog ─────────────────────────────────────────────────────────────────────
+function drawFrog(ctx, s) {
+  const lw = s < 1 ? 2.5 : 3;
+  prep(ctx, lw);
+
+  // Main body
+  oval(ctx, 200*s, 308*s, 125*s, 105*s);
+
+  // Bulgy eyes (sit on top, slightly overlap body — connected region)
+  circ(ctx, 148*s, 195*s, 42*s);
+  circ(ctx, 252*s, 195*s, 42*s);
+
+  // Pupils
+  circ(ctx, 150*s, 198*s, 20*s);
+  circ(ctx, 254*s, 198*s, 20*s);
+
+  // Wide goofy smile
+  ctx.beginPath();
+  ctx.arc(200*s, 264*s, 80*s, 0.05, Math.PI - 0.05);
+  ctx.stroke();
+
+  // Tongue (oval)
+  oval(ctx, 200*s, 302*s, 30*s, 18*s);
+  // Tongue split line
+  ctx.beginPath();
+  ctx.moveTo(170*s, 302*s);
+  ctx.lineTo(230*s, 302*s);
+  ctx.stroke();
+
+  // Belly
+  oval(ctx, 200*s, 323*s, 80*s, 64*s);
+
+  // Left arm + hand
+  ctx.beginPath();
+  ctx.moveTo(79*s, 282*s);
+  ctx.bezierCurveTo(48*s,294*s, 36*s,324*s, 58*s,348*s);
+  ctx.stroke();
+  circ(ctx, 60*s, 355*s, 16*s);
+
+  // Right arm + hand
+  ctx.beginPath();
+  ctx.moveTo(321*s, 282*s);
+  ctx.bezierCurveTo(352*s,294*s, 364*s,324*s, 342*s,348*s);
+  ctx.stroke();
+  circ(ctx, 340*s, 355*s, 16*s);
+
+  // Left foot
+  ctx.beginPath();
+  ctx.moveTo(96*s, 392*s);
+  ctx.bezierCurveTo(72*s,412*s, 58*s,430*s, 72*s,445*s);
+  ctx.stroke();
+  oval(ctx, 82*s, 448*s, 32*s, 13*s, -0.18);
+
+  // Right foot
+  ctx.beginPath();
+  ctx.moveTo(304*s, 392*s);
+  ctx.bezierCurveTo(328*s,412*s, 342*s,430*s, 328*s,445*s);
+  ctx.stroke();
+  oval(ctx, 318*s, 448*s, 32*s, 13*s, 0.18);
+
+  // Nostrils
+  circ(ctx, 185*s, 238*s, 5*s);
+  circ(ctx, 215*s, 238*s, 5*s);
+}
+
+// ─── Dino ─────────────────────────────────────────────────────────────────────
+function drawDino(ctx, s) {
+  const lw = s < 1 ? 2.5 : 3;
+  prep(ctx, lw);
+
+  // Body
+  oval(ctx, 196*s, 298*s, 120*s, 98*s);
+
+  // Head (overlaps with body at neck — connected region)
+  circ(ctx, 315*s, 165*s, 72*s);
+
+  // Back spikes (closed triangles — each individually fillable)
+  [
+    [152,200], [177,178], [200,165], [222,163],
+  ].forEach(([bx, by]) => {
+    tri(ctx, (bx-11)*s, (by+16)*s, bx*s, (by-20)*s, (bx+11)*s, (by+16)*s);
+  });
+
+  // Tail (open curve)
+  ctx.beginPath();
+  ctx.moveTo(76*s, 302*s);
+  ctx.bezierCurveTo(38*s,322*s, 20*s,360*s, 40*s,388*s);
+  ctx.bezierCurveTo(50*s,402*s, 68*s,394*s, 62*s,372*s);
+  ctx.stroke();
+
+  // Tiny left arm + hand
+  ctx.beginPath();
+  ctx.moveTo(112*s, 248*s);
+  ctx.bezierCurveTo(76*s,246*s, 60*s,268*s, 80*s,285*s);
+  ctx.stroke();
+  circ(ctx, 82*s, 292*s, 14*s);
+
+  // Left leg + foot
+  ctx.beginPath();
+  ctx.moveTo(118*s, 380*s);
+  ctx.bezierCurveTo(100*s,400*s, 95*s,428*s, 115*s,443*s);
+  ctx.stroke();
+  oval(ctx, 120*s, 447*s, 32*s, 12*s);
+
+  // Right leg + foot
+  ctx.beginPath();
+  ctx.moveTo(274*s, 380*s);
+  ctx.bezierCurveTo(286*s,400*s, 290*s,428*s, 274*s,443*s);
+  ctx.stroke();
+  oval(ctx, 270*s, 447*s, 32*s, 12*s);
+
+  // Eye + pupil
+  circ(ctx, 334*s, 148*s, 22*s);
+  circ(ctx, 337*s, 151*s, 10*s);
+
+  // Nostril
+  circ(ctx, 374*s, 171*s, 5*s);
+
+  // Big toothy smile
+  ctx.beginPath();
+  ctx.arc(326*s, 193*s, 52*s, -0.08, Math.PI + 0.08);
+  ctx.stroke();
+
+  // Teeth (4 V-shapes)
+  [296, 314, 332, 350].forEach(tx => {
+    ctx.beginPath();
+    ctx.moveTo(tx*s, 193*s);
+    ctx.lineTo((tx+8)*s, 214*s);
+    ctx.lineTo((tx+16)*s, 193*s);
+    ctx.stroke();
+  });
+
+  // Belly
+  oval(ctx, 200*s, 308*s, 68*s, 57*s);
+}
+
+// ─── Drawing dispatch ─────────────────────────────────────────────────────────
+const DRAWINGS = [drawCat, drawFrog, drawDino];
+
+function renderDrawing(ctx, idx, s) {
+  const w = ctx.canvas.width;
+  const h = ctx.canvas.height;
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, w, h);
+  DRAWINGS[idx](ctx, s);
+}
+
+// ─── Flood fill ───────────────────────────────────────────────────────────────
+function hexToRgb(hex) {
+  const m = hex.match(/^#([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i);
+  return m ? [parseInt(m[1],16), parseInt(m[2],16), parseInt(m[3],16)] : null;
+}
+
+function floodFill(canvas, startX, startY, fillHex) {
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const imgData = ctx.getImageData(0, 0, W, H);
+  const data = imgData.data;
+
+  const x0 = Math.round(startX), y0 = Math.round(startY);
+  if (x0 < 0 || x0 >= W || y0 < 0 || y0 >= H) return;
+
+  const base = (y0 * W + x0) * 4;
+  const sr = data[base], sg = data[base+1], sb = data[base+2];
+
+  // Don't paint on dark outline pixels
+  if (sr < 80 && sg < 80 && sb < 80) return;
+
+  const rgb = hexToRgb(fillHex);
+  if (!rgb) return;
+  const [fr, fg, fb] = rgb;
+
+  // Already this color — nothing to do
+  if (sr === fr && sg === fg && sb === fb) return;
+
+  const TOL = 40;
+  function matches(i) {
+    return Math.abs(data[i]   - sr) <= TOL &&
+           Math.abs(data[i+1] - sg) <= TOL &&
+           Math.abs(data[i+2] - sb) <= TOL;
+  }
+
+  // Iterative BFS using typed arrays for speed
+  const visited = new Uint8Array(W * H);
+  const queue   = new Int32Array(W * H);
+  let qHead = 0, qTail = 0;
+
+  const start = y0 * W + x0;
+  queue[qTail++] = start;
+  visited[start] = 1;
+
+  while (qHead < qTail) {
+    const pos = queue[qHead++];
+    const i = pos * 4;
+    data[i] = fr; data[i+1] = fg; data[i+2] = fb; data[i+3] = 255;
+
+    const px = pos % W, py = (pos / W) | 0;
+    const n = [
+      px > 0   ? pos - 1 : -1,
+      px < W-1 ? pos + 1 : -1,
+      py > 0   ? pos - W : -1,
+      py < H-1 ? pos + W : -1,
+    ];
+    for (let k = 0; k < 4; k++) {
+      const nb = n[k];
+      if (nb >= 0 && !visited[nb] && matches(nb * 4)) {
+        visited[nb] = 1;
+        queue[qTail++] = nb;
+      }
+    }
+  }
+
+  ctx.putImageData(imgData, 0, 0);
+}
+
+// ─── Canvas coordinate helper ─────────────────────────────────────────────────
+function getCanvasXY(canvas, e) {
+  const rect = canvas.getBoundingClientRect();
+  return {
+    x: (e.clientX - rect.left) * (canvas.width  / rect.width),
+    y: (e.clientY - rect.top)  * (canvas.height / rect.height),
+  };
+}
+
+// ─── Screen management ────────────────────────────────────────────────────────
+let currentIdx = 0;
+
+function startColoring(idx) {
+  currentIdx = idx;
+  document.getElementById('select-screen').style.display = 'none';
+  const cs = document.getElementById('color-screen');
+  cs.style.display = 'flex';
+
+  const canvas = document.getElementById('main-canvas');
+  renderDrawing(canvas.getContext('2d'), idx, 1);
+
+  // Reset to first color
+  selectedColor = COLORS[0].hex;
+  document.querySelectorAll('.swatch').forEach((sw, i) => {
+    sw.classList.toggle('active', i === 0);
+  });
+}
+
+function goBack() {
+  document.getElementById('color-screen').style.display = 'none';
+  document.getElementById('select-screen').style.display = 'flex';
+}
+
+// ─── Palette ──────────────────────────────────────────────────────────────────
+function buildPalette() {
+  const palette = document.getElementById('palette');
+  COLORS.forEach((c, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'swatch' + (i === 0 ? ' active' : '');
+    btn.style.background = c.hex;
+    if (c.icon) {
+      btn.textContent = c.icon;
+      btn.style.fontSize = '22px';
+    }
+    btn.addEventListener('pointerdown', e => {
+      e.stopPropagation();
+      selectedColor = c.hex;
+      document.querySelectorAll('.swatch').forEach(s => s.classList.remove('active'));
+      btn.classList.add('active');
+    });
+    palette.appendChild(btn);
+  });
+}
+
+// ─── Main canvas tap / click ──────────────────────────────────────────────────
+function setupMainCanvas() {
+  const canvas = document.getElementById('main-canvas');
+  canvas.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    const { x, y } = getCanvasXY(canvas, e);
+    floodFill(canvas, x, y, selectedColor);
+  });
+}
+
+// ─── Thumbnails ───────────────────────────────────────────────────────────────
+function drawThumbnails() {
+  const s = 150 / 400; // ≈ 0.375
+  for (let i = 0; i < 3; i++) {
+    const canvas = document.getElementById(`t${i}`);
+    renderDrawing(canvas.getContext('2d'), i, s);
+  }
+}
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+buildPalette();
+setupMainCanvas();
+drawThumbnails();
+</script>
+</body>
+</html>
